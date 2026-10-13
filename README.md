@@ -6,7 +6,7 @@ Evolis は現行の macOS ドライバを Pebble 世代には出していませ�
 > Driving the Evolis Pebble 4 ID card printer from macOS. Evolis ships no current macOS driver for
 > this generation, but the printer's command set is documented and the transport is USB printer class.
 
-**macOS の印刷ダイアログから、黒（K）リボンで片面印刷ができます（2026-10-13、macOS 27.0.1 / Apple Silicon で確認）。** カラー（YMCKO）リボンと両面は未対応です。
+**macOS の印刷ダイアログから、黒（K）リボンで片面印刷ができます（2026-10-13、macOS 27.0.1 / Apple Silicon で確認）。** カラー（YMCKO）はツールから刷れるところまでで、CUPS ドライバは黒のみです。両面は未対応です。
 
 ## 分かっていること（2026-10-13 時点の調査）
 
@@ -92,6 +92,35 @@ cd tools
 ../.venv/bin/python evolis_print.py /tmp/testcard.png --send
 ```
 
+### カラー（YMCKO）の印刷（2026-10-13、ツールから成功）
+
+[A5013](https://idoc.pub/documents/programming-guide-evolis-qu2-en5k9g7wqpno) と
+[qz-tray の実装](https://github.com/qzind/tray/blob/master/src/qz/printer/action/raw/converter/Evolis.java)に従った形で刷れた。
+
+```
+ESC Pr;ymckos CR                    リボン（R3013 ハーフパネルなら ymckos、全面パネルなら ymcko）
+ESC Ss CR
+ESC Sr CR
+ESC Db;y;32;<411480 バイト> CR      Y/M/C は 1 ドット 5bit をビット単位で詰める（MSB が先）。値はインク量で 0 = 塗らない
+ESC Db;m;32;<411480 バイト> CR
+ESC Db;c;32;<411480 バイト> CR
+ESC Db;k;2;<82296 バイト> CR        黒（樹脂）は 1bit
+ESC Db;o;2;<82296 バイト> CR        オーバーレイ。1 = 保護層を乗せる
+ESC Se CR
+```
+
+- ドットの並びは黒と同じ（カードを時計回りに 90° 回し、1 行 648 ドット × 1016 行）
+- **`Pr` で設定したリボンの種類は本体に保存される。** `Rr;p` で読める
+- **リボンの種類を間違えるとジャムる。** ハーフパネルの R3013 に `ymcko` を送ったら、印刷途中で止まってカードが詰まった
+- **ハーフパネル（R3013）で色が乗るのはカードの左側だけ。** 左端から約 43%（約 435 ドット）。黒とオーバーレイは全面
+- 黒に近い色（RGB の最大値が 15% 未満）は黒パネルに回している。グレーの階調に段差が出るので要改善
+
+```bash
+cd tools
+../.venv/bin/python make_colorcard.py /tmp/colorcard.png
+../.venv/bin/python evolis_print.py /tmp/colorcard.png --ribbon ymckos --send
+```
+
 ## CUPS ドライバ
 
 [`driver/`](driver/) に、印刷ダイアログから使うための CUPS フィルタと PPD がある。
@@ -122,7 +151,9 @@ sudo driver/install.sh --uninstall
 3. ~~**`ESC Rtp` を投げて機種名が返るか**を見る~~ ✅ `Pebble 4` が返った
 4. ~~ラスタ → `Db` の変換~~ ✅ 片面・黒で成功
 5. ~~CUPS から使えるようにする~~ ✅ 印刷ダイアログから印刷できた
-6. カラー（YMCKO）リボン、コントラストなどのオプション、配布用の pkg
+6. ~~カラー（YMCKO）をツールから刷る~~ ✅
+7. CUPS ドライバのカラー対応（リボンの種類を選ぶ、ハーフパネルの範囲外の色の扱い、黒の分け方）
+8. コントラストなどのオプション、配布用の pkg
 
 ## 進め方のメモ
 
