@@ -38,7 +38,7 @@ else
 fi
 
 echo "==> PPD を生成"
-python3 "$HERE/mkppd.py" > "$BUILD/Pebble4.ppd"
+EVOLIS_VERSION="$VER" python3 "$HERE/mkppd.py" > "$BUILD/Pebble4.ppd"
 # ビルド時はフィルタもアプリもまだ入っていないので、その指摘だけ除外して判定する。
 # cupstestppd は失敗を返すので、パイプ(pipefail)ではなく出力を受け取ってから調べる
 PROBLEMS="$(cupstestppd "$BUILD/Pebble4.ppd" 2>&1 | grep -F '**FAIL**' \

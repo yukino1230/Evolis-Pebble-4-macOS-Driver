@@ -3,6 +3,7 @@
 
 出力は Shift-JIS（PPD 仕様で UTF-8 は使えないため）。
 """
+import os
 import sys
 
 MM = 72 / 25.4
@@ -30,7 +31,8 @@ def main():
     def w(s): p.append(s)
     w('*PPD-Adobe: "4.3"')
     w('*FormatVersion: "4.3"')
-    w('*FileVersion: "1.0"')
+    # 「設定」>「プリンタとスキャナ」の「ドライバのバージョン」に出る。build-pkg.sh が pkg の版を渡す
+    w(f'*FileVersion: "{os.environ.get("EVOLIS_VERSION", "1.1")}"')
     w('*LanguageEncoding: JIS83-RKSJ')
     w('*LanguageVersion: Japanese')
     w('*Manufacturer: "Evolis"')
