@@ -88,7 +88,7 @@ def main():
     # コントラスト (Pc)。本体は 0..20、工場出荷時 10。黒の網点の補正は 10 で測ったもの
     for key, label, order in (("EvolisContrastK", "黒 / 単色リボンの濃さ", 20),
                               ("EvolisContrastColor", "カラーの濃さ (カラーリボン)", 30),
-                              ("EvolisBrightness", "カラーの明るさ (カラーリボン)", 31),
+                              ("EvolisBrightness", "カラーの明るさ (カラーリボン、大きいほど明るい)", 31),
                               ("EvolisContrastOverlay", "オーバーレイの濃さ", 32)):
         w(f'*OpenUI *{key}/{label}: PickOne')
         w(f'*OrderDependency: {order} AnySetup *{key}')

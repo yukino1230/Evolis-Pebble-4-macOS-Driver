@@ -261,7 +261,7 @@ static void print_card(const struct ribbon *r) {
 
 static const struct ribbon *ribbon = &RIBBONS[0];
 static int contrast_k = 10, contrast_color = 10, contrast_o = 10;   /* Pc の値 0..20、工場出荷時 10 */
-static int brightness = 10;                                         /* Pl の値 0..20、工場出荷時 10 */
+static int brightness = 10;   /* 印刷ダイアログの明るさ 0..20 (標準 10)。大きいほど明るい */
 
 static void set_option(const char *key, const char *val) {
     if (!strcmp(key, "EvolisRibbon")) {
@@ -383,7 +383,9 @@ int main(int argc, char **argv) {
                     snprintf(cmd, sizeof cmd, "Pc;%c;=;%d", *p, contrast_color);
                     esc(cmd);
                 }
-                snprintf(cmd, sizeof cmd, "Pl;a;=;%d", brightness);   /* Y/M/C の明るさ */
+                /* 本体の Pl (Luminosity) は値を上げるほど色が暗く(濃く)なる(実機で確認)。
+                   ダイアログの「明るさ」は名前どおり上げると明るくなるように、逆にして送る */
+                snprintf(cmd, sizeof cmd, "Pl;a;=;%d", 20 - brightness);
                 esc(cmd);
             }
             if (ribbon->overlay) {
