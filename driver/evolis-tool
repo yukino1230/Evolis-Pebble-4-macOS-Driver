@@ -7,9 +7,10 @@
 set -eu
 QUEUE=""
 ACTION=""
-# メッセージの言語: LANG が ja なら日本語、それ以外は英語。LANG が無いとき(sudo で消えたときなど)は
-# macOS の言語設定(AppleLanguages の先頭)を見る
+# メッセージの言語: LANG が ja なら日本語、それ以外は英語。LANG が無いとき(sudo で消えたときなど)や
+# 言語を決めていない C / POSIX のときは、macOS の言語設定(AppleLanguages の先頭)を見る
 lang="${LANG:-}"
+case "$lang" in C|C.*|POSIX) lang="" ;; esac
 if [ -z "$lang" ]; then
   u="${SUDO_USER:-$(id -un)}"
   lang="$( (if [ "$(id -u)" = 0 ] && [ "$u" != root ]; then sudo -u "$u" defaults read -g AppleLanguages; \
