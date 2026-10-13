@@ -29,6 +29,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleExecutable</key><string>Evolis Utility</string>
   <key>CFBundleIdentifier</key><string>jp.yukino.evolis-utility</string>
   <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundleShortVersionString</key><string>$VER</string>
   <key>CFBundleVersion</key><string>$VER</string>
   <key>CFBundleDevelopmentRegion</key><string>en</string>
@@ -42,6 +43,8 @@ PLIST
 
 # 画面の訳(英語がキーで、ja.lproj に日本語)
 cp -R "$HERE"/Resources/*.lproj "$APP/Contents/Resources/"
+# アイコン(tools/make_icon.py で描いたもの)
+cp "$HERE/Resources/AppIcon.icns" "$APP/Contents/Resources/"
 
 xattr -cr "$APP" 2>/dev/null || true
 if [ -n "$SIGN_APP" ]; then
