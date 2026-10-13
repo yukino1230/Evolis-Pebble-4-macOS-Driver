@@ -11,6 +11,51 @@ Evolis は現行の macOS ドライバを Pebble 世代には出していませ�
 > **非公式のドライバです。** Evolis 社とは関係がなく、同社の承認やサポートは受けていません。
 > 使用は自己責任でお願いします（[下記](#無保証自己責任)）。
 
+## インストール
+
+[Releases](https://github.com/yukino1230/Evolis-Pebble-4-macOS-Driver/releases/latest) から
+`evolis-pebble4-<版>.pkg` をダウンロードして、ダブルクリックで入れる（Developer ID で署名し、Apple の公証を通してある）。
+そのあと、プリンタを USB でつないで電源を入れ、キューを登録する。
+
+```bash
+sudo evolis-setup --ribbon k
+```
+
+`--ribbon` には、付いているリボンを指定する（`k` 黒 / `ymckos` ハーフパネルのカラー / `ymcko` 全面パネルのカラーなど。
+[リボンの種類](#リボンの種類pr)を参照）。付け替えたら `sudo lpadmin -p Evolis_Pebble_4 -o EvolisRibbon=<種類>` で変える。
+
+| 入るもの | 場所 |
+|---|---|
+| CUPS フィルタ（Intel / Apple Silicon 両対応） | `/usr/local/libexec/cups/filter/rastertoevolis` |
+| PPD | `/Library/Printers/PPDs/Contents/Resources/EvolisPebble4.ppd.gz`、`/usr/local/share/evolis/Pebble4.ppd` |
+| キューの登録コマンド | `/usr/local/bin/evolis-setup` |
+
+PPD にはプリンタの ID（`MFG:EVOLIS;MDL:Pebble`）を書いてあるので、「設定」→「プリンタとスキャナ」→「プリンタを追加」でも
+このドライバが選ばれるはず（未確認）。その場合、エラーのときにプリンタごと止まらないようにする設定（`printer-error-policy=abort-job`）と
+既定のリボンは付かないので、`evolis-setup` で登録するのがおすすめ。
+
+アンインストール:
+
+```bash
+sudo evolis-setup --remove
+sudo rm -f /usr/local/libexec/cups/filter/rastertoevolis /usr/local/bin/evolis-setup \
+           /Library/Printers/PPDs/Contents/Resources/EvolisPebble4.ppd.gz
+sudo rm -rf /usr/local/share/evolis
+sudo pkgutil --forget jp.yukino.evolis-pebble4
+```
+
+### 自分でビルドする
+
+Xcode のコマンドラインツール（`xcode-select --install`）と python3 が要る。
+
+```bash
+./driver/build-pkg.sh 1.0              # build/pkg/evolis-pebble4-1.0.pkg ができる
+sudo driver/install.sh --ribbon k      # pkg を作らずに、その場でビルドして入れる（開発用）
+```
+
+`build-pkg.sh` は Developer ID 証明書があれば自動で署名する（無ければ未署名のまま作る）。
+`EVOLIS_NOTARY=<notarytool のプロファイル名>` を付けると公証まで行う。
+
 ## 分かっていること（2026-10-13 時点の調査）
 
 | | |
@@ -308,14 +353,10 @@ libcups にも Ghostscript にも依存しない。
 | 1 ページ | カード 1 枚（ページごとに `Ss`〜`Se`）。部数 2 でも、内容の違う 2 ページの文書でも、2 枚続けて正常に刷れることを実機で確認 |
 | 白紙・用紙違いの確認 | 真っ白なページは刷らない。全部白紙、またはカードの大きさ（85.6×54mm ±2mm）でないページはジョブを止め、キューに理由を出す |
 | 配置 | 1011×638 ドットのラスタを、プリンタの 1016×648 の中央に置く。縦長のページは横向きに回す |
-| リボン | 下の表のとおり。`install.sh --ribbon` で既定を決める |
+| リボン | 下の表のとおり。`evolis-setup --ribbon`（または `install.sh --ribbon`）で既定を決める |
 | 濃さ | 黒（単色リボン）の濃さ・カラーの濃さを 0〜20（標準 10）で選べる。`Pc` で毎ジョブ送る |
 
-```bash
-xcode-select --install                 # clang が要る
-sudo driver/install.sh                 # USB の Evolis を探してキュー Evolis_Pebble_4 を作る
-sudo driver/install.sh --uninstall
-```
+入れ方は[インストール](#インストール)を参照。
 
 テストカードの PDF を `cupsfilter` → `rastertoevolis` に通し、出力のビットマップを画像に戻して、
 向きと位置が元画像と一致することを確かめた。そのうえで、実機の印刷ダイアログからカードが刷れることを確認済み（macOS 27.0.1 / Apple Silicon、USB 接続）。

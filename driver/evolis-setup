@@ -1,0 +1,36 @@
+#!/bin/bash
+# Evolis Pebble 4 のプリンタキューを登録する(pkg で入れたあとに使う)
+#   sudo evolis-setup [--ribbon k|ymcko|ymckos|ko|kw|kr|kbl|kgr|kgo|ksi|ksc|ka] [--queue Evolis_Pebble_4]
+#   sudo evolis-setup --remove [--queue Evolis_Pebble_4]
+#     --ribbon は印刷ダイアログの既定のリボン(装着しているものに合わせる。既定 k)
+set -eu
+QUEUE="Evolis_Pebble_4"
+RIBBON="k"
+REMOVE=0
+PPD=/usr/local/share/evolis/Pebble4.ppd
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --ribbon) RIBBON="$2"; shift 2 ;;
+    --queue)  QUEUE="$2"; shift 2 ;;
+    --remove) REMOVE=1; shift ;;
+    *) echo "不明な引数: $1"; exit 1 ;;
+  esac
+done
+
+[ "$(id -u)" = "0" ] || { echo "sudo で実行してください"; exit 1; }
+if [ "$REMOVE" = 1 ]; then
+  lpadmin -x "$QUEUE" && echo "削除しました: $QUEUE"; exit 0
+fi
+case "$RIBBON" in k|ymcko|ymckos|ko|kw|kr|kbl|kgr|kgo|ksi|ksc|ka) ;;
+  *) echo "--ribbon は k / ymcko / ymckos / ko / kw / kr / kbl / kgr / kgo / ksi / ksc / ka のどれか"; exit 1 ;; esac
+[ -f "$PPD" ] || { echo "PPD がありません: $PPD(pkg を入れてください)"; exit 1; }
+
+URI="$(lpinfo -v 2>/dev/null | awk '$2 ~ /^usb:\/\/EVOLIS\// {print $2; exit}')"
+[ -n "$URI" ] || { echo "USB で Evolis が見つかりません。電源と接続を確認してください"; exit 1; }
+
+# エラーのとき(用紙サイズの選び忘れなど)はプリンタを止めず、そのジョブだけ止める
+lpadmin -p "$QUEUE" -E -v "$URI" -P "$PPD" -D "Evolis Pebble 4" -L "USB" \
+        -o printer-is-shared=false -o EvolisRibbon="$RIBBON" -o printer-error-policy=abort-job
+echo "完了しました。「設定」>「プリンタとスキャナ」に Evolis Pebble 4 が出ます(既定のリボン: $RIBBON)。"
+echo "  リボンを付け替えたら: sudo lpadmin -p $QUEUE -o EvolisRibbon=<種類>"
+echo "  削除: sudo evolis-setup --remove"
