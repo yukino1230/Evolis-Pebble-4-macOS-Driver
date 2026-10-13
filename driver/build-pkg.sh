@@ -22,7 +22,7 @@ NOTARY="${EVOLIS_NOTARY:-}"
 
 rm -rf "$BUILD"; mkdir -p "$ROOT" "$BUILD/scripts"
 mkdir -p "$ROOT/usr/local/libexec/cups/filter" "$ROOT/usr/local/bin" "$ROOT/usr/local/share/evolis" \
-         "$ROOT/Library/Printers/PPDs/Contents/Resources"
+         "$ROOT/Library/Printers/PPDs/Contents/Resources" "$ROOT/Applications"
 
 echo "==> CUPS フィルタをビルド(ユニバーサル)"
 FILTER="$ROOT/usr/local/libexec/cups/filter/rastertoevolis"
@@ -39,9 +39,12 @@ fi
 
 echo "==> PPD を生成"
 python3 "$HERE/mkppd.py" > "$BUILD/Pebble4.ppd"
-# ビルド時はフィルタがまだ /usr/local に無いので、その指摘だけ除外して判定する
-if cupstestppd "$BUILD/Pebble4.ppd" 2>&1 | grep -E "FAIL|失敗" | grep -v "rastertoevolis"; then
-  echo "PPD に問題があります"; exit 1
+# ビルド時はフィルタもアプリもまだ入っていないので、その指摘だけ除外して判定する。
+# cupstestppd は失敗を返すので、パイプ(pipefail)ではなく出力を受け取ってから調べる
+PROBLEMS="$(cupstestppd "$BUILD/Pebble4.ppd" 2>&1 | grep -F '**FAIL**' \
+            | grep -v -e rastertoevolis -e APPrinterUtilityPath || true)"
+if [ -n "$PROBLEMS" ]; then
+  echo "$PROBLEMS"; echo "PPD に問題があります"; exit 1
 fi
 install -m 644 "$BUILD/Pebble4.ppd" "$ROOT/usr/local/share/evolis/Pebble4.ppd"
 # 「設定」>「プリンタとスキャナ」で追加するときに macOS が見つける場所
@@ -51,6 +54,9 @@ chmod 644 "$ROOT/Library/Printers/PPDs/Contents/Resources/EvolisPebble4.ppd.gz"
 echo "==> キュー登録コマンドと本体の機能を呼ぶコマンドを配置"
 install -m 755 "$HERE/evolis-setup" "$ROOT/usr/local/bin/evolis-setup"
 install -m 755 "$HERE/evolis-tool"  "$ROOT/usr/local/bin/evolis-tool"
+
+echo "==> Evolis Utility.app をビルド"
+EVOLIS_SIGN_APP="$SIGN_APP" "$HERE/../app/build-app.sh" "$VER" "$ROOT/Applications"
 
 echo "==> 拡張属性を除去"
 xattr -cr "$ROOT" 2>/dev/null || true
@@ -66,7 +72,10 @@ chmod 755 "$BUILD/scripts/postinstall"
 
 echo "==> パッケージを作成"
 PKG="$BUILD/evolis-pebble4-$VER.pkg"
-pkgbuild --root "$ROOT" --scripts "$BUILD/scripts" \
+# アプリは必ず /Applications に入れる(既定ではインストーラが既存のアプリの場所を探して上書きする)
+pkgbuild --analyze --root "$ROOT" "$BUILD/components.plist" >/dev/null
+plutil -replace 0.BundleIsRelocatable -bool NO "$BUILD/components.plist"
+pkgbuild --root "$ROOT" --scripts "$BUILD/scripts" --component-plist "$BUILD/components.plist" \
          --identifier jp.yukino.evolis-pebble4 --version "$VER" \
          --ownership recommended --install-location / \
          "$PKG"

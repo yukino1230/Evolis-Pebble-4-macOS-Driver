@@ -40,6 +40,8 @@ def main():
     w('*PCFileName: "PEBBLE4.PPD"')
     w('*Product: "(Pebble 4)"')
     w('*1284DeviceID: "MFG:EVOLIS;MDL:Pebble;"')
+    # 「設定」>「プリンタとスキャナ」の「プリンタユーティリティを開く」で起動するアプリ
+    w('*APPrinterUtilityPath: "/Applications/Evolis Utility.app"')
     w('*PSVersion: "(3010.000) 0"')
     w('*LanguageLevel: "3"')
     w('*ColorDevice: True')

@@ -30,6 +30,7 @@ sudo evolis-setup --ribbon k
 | PPD | `/Library/Printers/PPDs/Contents/Resources/EvolisPebble4.ppd.gz`、`/usr/local/share/evolis/Pebble4.ppd` |
 | キューの登録コマンド | `/usr/local/bin/evolis-setup` |
 | 本体の機能を呼ぶコマンド | `/usr/local/bin/evolis-tool`（テストカード、技術テストカード、クリーニング） |
+| ユーティリティ | `/Applications/Evolis Utility.app`（プリンタの状態、クリーニングの時期、テストカード、クリーニング） |
 
 **ターミナルを使わずに登録することもできる。** PPD にプリンタの ID（`MFG:EVOLIS;MDL:Pebble`）を書いてあるので、
 「設定」→「プリンタとスキャナ」→「プリンタを追加」で「EVOLIS Pebble」（種類 USB）を選ぶと、ドライバに
@@ -46,11 +47,25 @@ sudo evolis-setup --ribbon k
 
 ```bash
 sudo evolis-setup --remove           # システム設定で登録した場合は、そこで削除する
-sudo rm -f /usr/local/libexec/cups/filter/rastertoevolis /usr/local/bin/evolis-setup \
+sudo rm -f /usr/local/libexec/cups/filter/rastertoevolis /usr/local/bin/evolis-setup /usr/local/bin/evolis-tool \
            /Library/Printers/PPDs/Contents/Resources/EvolisPebble4.ppd.gz
-sudo rm -rf /usr/local/share/evolis
+sudo rm -rf /usr/local/share/evolis "/Applications/Evolis Utility.app"
 sudo pkgutil --forget jp.yukino.evolis-pebble4
 ```
+
+### Evolis Utility
+
+プリンタの状態を見たり、本体の機能を呼んだりするアプリ。pkg で `/Applications` に入る。
+「設定」→「プリンタとスキャナ」でプリンタを選び、「プリンタユーティリティを開く」からも起動できる（PPD の
+`*APPrinterUtilityPath`）。
+
+- **プリンタ**: 機種、ファームウェア、入れたカードの数、刷ったパネルの数
+- **設定（本体に残っている値）**: リボンの設定、黒・カラー・オーバーレイの濃さ、カラーの明るさ
+- **クリーニング**: 時期（`Rlr;r`）、回数、平均・最大の間隔
+- **ボタン**: テストカード、技術テストカード、クリーニング（確認してから送る）
+
+USB は macOS 標準の IOUSBHost で直接読み書きする（libusb も Python も要らない）。印刷中は CUPS がプリンタを
+掴んでいるので読めず、「使用中」と出る。ソースは [`app/`](app/)、ビルドは `app/build-app.sh`。
 
 ### 自分でビルドする
 

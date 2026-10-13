@@ -55,9 +55,10 @@ echo "==> PPD を生成"
 PPD="$SHARE/Pebble4.ppd"
 python3 "$HERE/mkppd.py" > "$PPD"
 chown root:wheel "$PPD"; chmod 644 "$PPD"
-if cupstestppd "$PPD" | grep -qE "FAIL|失敗"; then
-  cupstestppd "$PPD" | grep -E "FAIL|失敗"
-  echo "PPD に問題があります"; exit 1
+# Evolis Utility.app は pkg で入れるもので、install.sh では入らないので、その指摘は除外する
+PROBLEMS="$(cupstestppd "$PPD" 2>&1 | grep -F '**FAIL**' | grep -v -e APPrinterUtilityPath || true)"
+if [ -n "$PROBLEMS" ]; then
+  echo "$PROBLEMS"; echo "PPD に問題があります"; exit 1
 fi
 echo "    OK"
 
