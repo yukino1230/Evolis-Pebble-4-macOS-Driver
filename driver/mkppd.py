@@ -67,6 +67,16 @@ def main():
         w(f'*EvolisRibbon {v}/{label}: ""')
     w('*CloseUI: *EvolisRibbon')
     w('')
+    # オーバーレイ(保護層)を乗せる範囲。オーバーレイのあるリボン(YMCKO、KO)だけで使う
+    w('*OpenUI *EvolisOverlay/オーバーレイ (保護層): PickOne')
+    w('*OrderDependency: 12 AnySetup *EvolisOverlay')
+    w('*DefaultEvolisOverlay: full')
+    w('*EvolisOverlay full/全面: ""')
+    w('*EvolisOverlay none/なし: ""')
+    w('*EvolisOverlay chipiso/IC チップを避ける (ISO 7816): ""')
+    w('*EvolisOverlay magstripe/磁気ストライプを避ける (ISO 7811、裏面用): ""')
+    w('*CloseUI: *EvolisOverlay')
+    w('')
     # コントラスト (Pc)。本体は 0..20、工場出荷時 10。黒の網点の補正は 10 で測ったもの
     for key, label, order in (("EvolisContrastK", "黒 / 単色リボンの濃さ", 20),
                               ("EvolisContrastColor", "カラーの濃さ (カラーリボン)", 30)):

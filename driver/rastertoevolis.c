@@ -205,6 +205,26 @@ static void put_panel(const char *name, int levels, unsigned bits,
     fputc('\r', stdout);
 }
 
+/* オーバーレイ(保護層)を乗せる範囲。避ける範囲はカードの表の左上からの mm (カードの規格による)。
+   キャンバスはカード(1011x638)を 1016x648 の中央に置いているので、そのずれを足す */
+enum { OV_FULL, OV_NONE, OV_CHIP, OV_MAG };
+static int overlay_mode = OV_FULL;
+static const char *overlay_name[] = { "full", "none", "chipiso", "magstripe" };
+
+static int mm_x(double mm) { return (int)(mm * 300 / 25.4 + 0.5) + (CARD_W - 1011) / 2; }
+static int mm_y(double mm) { return (int)(mm * 300 / 25.4 + 0.5) + (CARD_H - 638) / 2; }
+
+static int overlay_at(int px, int py) {
+    switch (overlay_mode) {
+    case OV_NONE: return 0;
+    case OV_CHIP:   /* ISO 7816-2 の接点(横 10.25-19.87、縦 19.23-28.55)にモジュールの大きさ分を足す */
+        return !(px >= mm_x(8.5) && px < mm_x(21.5) && py >= mm_y(17.5) && py < mm_y(30.5));
+    case OV_MAG:    /* ISO 7811 の磁気ストライプ(縦 5.54-15.82)に余裕を足す。裏面に刷るとき用 */
+        return !(py >= mm_y(5.0) && py < mm_y(17.6));
+    default: return 1;
+    }
+}
+
 static void print_card(const struct ribbon *r) {
     static unsigned char y[CARD_H][CARD_W], m[CARD_H][CARD_W], c[CARD_H][CARD_W],
                          k[CARD_H][CARD_W], o[CARD_H][CARD_W];
@@ -215,7 +235,7 @@ static void print_card(const struct ribbon *r) {
             const unsigned char *p = canvas[py][px];
             int hi = p[0], lo = p[0];
             y[py][px] = m[py][px] = c[py][px] = 0;
-            o[py][px] = 1;                                /* 保護層は全面 */
+            o[py][px] = (unsigned char)overlay_at(px, py);  /* 保護層 */
             if (px >= r->color_w) continue;               /* 色が乗らない範囲は黒の網点 */
             for (int i = 1; i < 3; i++) { if (p[i] > hi) hi = p[i]; if (p[i] < lo) lo = p[i]; }
             k[py][px] = hi < K_MAX && hi - lo < K_CHROMA;
@@ -243,6 +263,9 @@ static void set_option(const char *key, const char *val) {
     if (!strcmp(key, "EvolisRibbon")) {
         for (int i = 0; i < NRIBBONS; i++)
             if (!strcmp(val, RIBBONS[i].name)) ribbon = &RIBBONS[i];
+    } else if (!strcmp(key, "EvolisOverlay")) {
+        for (int i = 0; i < 4; i++)
+            if (!strcmp(val, overlay_name[i])) overlay_mode = i;
     } else if (!strcmp(key, "EvolisColorLevels")) {
         int v = atoi(val);
         if (v == 32 || v == 64 || v == 128) { levels = v; level_bits = v == 32 ? 5 : v == 64 ? 6 : 7; }
@@ -354,6 +377,7 @@ int main(int argc, char **argv) {
         print_card(ribbon);
         logmsg("INFO", "カード%d: %ux%u ドット %ubit リボン %s コントラスト 黒%d カラー%d",
                pages + 1, w, h, bpp, ribbon->name, contrast_k, contrast_color);
+        if (ribbon->overlay) logmsg("INFO", "オーバーレイ %s", overlay_name[overlay_mode]);
         pages++;
     }
     if (!pages) {
