@@ -6,7 +6,7 @@ Evolis は現行の macOS ドライバを Pebble 世代には出していませ�
 > Driving the Evolis Pebble 4 ID card printer from macOS. Evolis ships no current macOS driver for
 > this generation, but the printer's command set is documented and the transport is USB printer class.
 
-**まだ何も動いていません。** 分かっていることと、最初にやることを書いた状態です。
+**黒（K）リボンで片面印刷ができました（2026-10-13）。** CUPS からはまだ使えません。
 
 ## 分かっていること（2026-10-13 時点の調査）
 
@@ -43,12 +43,62 @@ ESC Se        CR   シーケンス終了
 | `ESC Rsn CR` | シリアル番号 |
 | `ESC Rco;l CR` | リボンのカウンタ |
 
+## 実機で確かめたこと（2026-10-13）
+
+| | |
+|---|---|
+| USB | VID `0x0F49` / PID `0x0100`、bcdDevice `0x0602`。インターフェース 0 がプリンタクラス（class 7 / protocol 2 = 双方向、bulk OUT/IN）。CUPS からは `usb://EVOLIS/Pebble?location=20100000` |
+| 通信 | macOS は class 7 を掴まないので、libusb（pyusb）でそのまま claim できる |
+| 返事の形 | ASCII + `\0` 終端。**次のコマンドを送るまで、IN を読むたびに同じ返事が繰り返し返ってくる**ので最初の `\0` で切る |
+
+[`tools/evolis_query.py`](tools/evolis_query.py) の結果:
+
+| コマンド | 返事 |
+|---|---|
+| `Rtp` | `Pebble 4` — A5013 のコマンド体系がそのまま通る |
+| `Rfv` | `1012` |
+| `Rsn` | `PB0839xxxxxxx` |
+| `Rco;l` | `2`（リボン残量？ 単位は要確認） |
+| `Rkn` | `411-D85xxxxx-D`（リボンの識別子？） |
+| `Rse` | `ERROR CDE` — 未知コマンドはこの形で返る |
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install pyusb
+.venv/bin/python tools/evolis_query.py            # Rtp Rfv Rsn Rco;l
+.venv/bin/python tools/evolis_query.py "Rco;l" Rkn
+```
+
+### 片面・黒の印刷（2026-10-13 成功）
+
+[`tools/evolis_print.py`](tools/evolis_print.py) が送るのは次の最小構成。`Pmi`（挿入モード）と `Pc`（コントラスト）は送らず、本体の既定値で通った。
+
+```
+ESC Pr;k CR
+ESC Ss CR
+ESC Sr CR
+ESC Db;k;2;<82296 バイト> CR
+ESC Se CR
+0x00 x 64
+```
+
+- 画像はカード全面 **1016×648 ドット（300dpi、横長）**
+- 時計回りに 90° 回したものを送る。1 行が 648 ドット = 81 バイトで、それが 1016 行。MSB が先で **1 = 黒**
+- この向きで、画面で見たままカードに刷られた（上下左右の反転なし）
+
+```bash
+.venv/bin/pip install pillow
+cd tools
+../.venv/bin/python make_testcard.py /tmp/testcard.png
+../.venv/bin/python evolis_print.py /tmp/testcard.png --send
+```
+
 ## 最初にやること
 
-1. USB で Mac に繋ぎ、`system_profiler SPUSBDataType` と `lpinfo -v` で見えるか確認する
-2. 双方向に話すために `libusb` を入れる（`brew install libusb`）
-3. **`ESC Rtp` を投げて機種名が返るか**を見る。これが通れば A5013 のコマンド表が使えることが確定する
-4. 返事の形を見てから、ラスタ → `Db` の変換（CUPS フィルタか PAPPL のプリンタアプリ）に進む
+1. ~~USB で Mac に繋ぎ、`system_profiler SPUSBDataType` と `lpinfo -v` で見えるか確認する~~ ✅
+2. ~~双方向に話すために `libusb` を入れる（`brew install libusb`）~~ ✅
+3. ~~**`ESC Rtp` を投げて機種名が返るか**を見る~~ ✅ `Pebble 4` が返った
+4. ~~ラスタ → `Db` の変換~~ ✅ 片面・黒で成功
+5. CUPS から使えるようにする（CUPS フィルタか PAPPL のプリンタアプリ）
 
 ## 進め方のメモ
 
