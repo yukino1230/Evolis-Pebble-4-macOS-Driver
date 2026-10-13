@@ -65,7 +65,8 @@ echo "==> プリンタキューを登録: $QUEUE"
 lpadmin -p "$QUEUE" -E -v "$URI" -P "$PPD" \
         -D "Evolis Pebble 4" -L "USB" -o printer-is-shared=false -o EvolisRibbon="$RIBBON" \
         -o printer-error-policy=abort-job
-# フィルタが用紙サイズの違うジョブを止めたとき、プリンタごと一時停止させずにそのジョブだけ取り消す
+# USB の送信処理が失敗したとき(ジョブの途中で電源を切ったときなど)、キュー全体を止めずにそのジョブだけ取り消す。
+# ドライバ(フィルタ)が止めたジョブは、この設定と関係なくそのジョブだけが止まる
 echo "    既定のリボン: $RIBBON"
 
 echo

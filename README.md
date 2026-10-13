@@ -35,8 +35,10 @@ sudo evolis-setup --ribbon k
 「Evolis Pebble 4」が自動で選ばれる（確認済み）。キュー名は `EVOLIS_Pebble` になる。ただし、この方法では次の 2 点が
 `evolis-setup` と違う:
 
-- エラーのとき（用紙サイズの選び忘れなど）、そのジョブだけでなくプリンタごと一時停止する。止めたくなければ
-  `sudo lpadmin -p EVOLIS_Pebble -o printer-error-policy=abort-job`
+- USB の送信処理が失敗したとき（ジョブの途中でプリンタの電源を切ったときなど）、キュー全体が一時停止し、キューの画面で
+  「再開」を押すまで次のジョブが刷られない（CUPS の既定 `printer-error-policy=stop-printer`）。そのジョブだけ取り消すには
+  `sudo lpadmin -p EVOLIS_Pebble -o printer-error-policy=abort-job`。用紙サイズの選び忘れなど、ドライバ（フィルタ）が
+  止めたジョブはこの設定と関係なく、そのジョブだけが止まる
 - 既定のリボンは黒（`k`）。カラーリボンなら `sudo lpadmin -p EVOLIS_Pebble -o EvolisRibbon=ymckos` などで変えるか、印刷ダイアログで選ぶ
 
 アンインストール:
@@ -306,7 +308,9 @@ R3314 と R4002 はカーデックスの一覧では PBL-4 用に載っている
 
 そこでドライバは**真っ白なページを刷らない**。ジョブ全体が真っ白なら、カードを送らずに止めて、キューに
 「印刷する内容がありません。印刷ダイアログで用紙サイズを「カード CR80」にしてください」と出す。
-`install.sh` はキューを `printer-error-policy=abort-job` にするので、プリンタ自体は止まらない（次のジョブは普通に刷れる）。
+ドライバ（フィルタ）が止めたジョブは、CUPS の決まりで「停止中」になるだけで、プリンタ自体は止まらない（次のジョブは普通に刷れる）。
+キューの `printer-error-policy` は USB の送信処理（バックエンド）が失敗したときにだけ使われ、フィルタの失敗には関係しない
+（[CUPS の `scheduler/job.c`](https://github.com/apple/cups/blob/master/scheduler/job.c) の `finalize_job`）。
 止めたジョブは「停止中」としてメッセージ付きでキューに残るので、「×」で消す（「↻」で再開しても同じ理由でまた止まる）。
 （カードより大きいラスタが届いた場合も止める。`lp` で大きい用紙を直接指定されたときの保険）
 
