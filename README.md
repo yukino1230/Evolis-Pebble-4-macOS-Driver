@@ -15,7 +15,7 @@ Evolis は現行の macOS ドライバを Pebble 世代には出していませ�
 
 | | |
 |---|---|
-| コマンドリファレンス | **公式の [Evolis Card Printers Programming Guide A5013](https://manualzz.com/doc/1932591/evolis-card-printers-programming-guide-a5013_reve)** が New Pebble / Tattoo / Dualys / Quantum / Kiosk をカバー。[Rev.D2 は表紙が "NEW PEBBLE PROGRAMMING GUIDE"](https://www.yumpu.com/en/document/view/54519120/new-pebble-programming-guide-a5013-revd2/9) |
+| コマンドリファレンス | **公式の Evolis Card Printers Programming Guide A5013** が New Pebble / Tattoo / Dualys / Quantum / Kiosk をカバー。[Rev.D2 は表紙が "NEW PEBBLE PROGRAMMING GUIDE"](https://www.yumpu.com/en/document/view/54519120/new-pebble-programming-guide-a5013-revd2/9)。コマンドの詳細は [Qu2 版の写し](https://idoc.pub/documents/programming-guide-evolis-qu2-en5k9g7wqpno)で確認した |
 | 公式 Linux ドライバ | 2014年12月に **Pebble 2 / 3 / 4** を含む世代向けの RPM / DEB が出ている（現在はレガシー扱い） |
 | 公式 macOS ドライバ | [現行の互換性表](https://www.evolis.com/wp-content/uploads/2022/05/Drivers-Compatibility-Chart-ENG.pdf)に **Pebble の行は無い** |
 | オープンソースの実装例 | [dpavlin/Printer-EVOLIS](https://github.com/dpavlin/Printer-EVOLIS)（Dualys 3 向け、Perl、GPLv2+）。実際に送るバイト列が読める |
@@ -114,9 +114,10 @@ ESC Se CR
 
 - ドットの並びは黒と同じ（カードを時計回りに 90° 回し、1 行 648 ドット × 1016 行）
 - **`Pr` で設定したリボンの種類は本体に保存される。** `Rr;p` で読める
-- **リボンの種類を間違えるとジャムる。** ハーフパネルの R3013 に `ymcko` を送ったら、印刷途中で止まってカードが詰まった
+- **リボンの種類を間違えると、カードが詰まったりリボンが切れたりする。** ハーフパネルの R3013 に `ymcko` を送ったら、
+  印刷途中で止まった。オーバーレイ（保護層）のリボンがカードに付いてきて、剥がそうとするとリボンが切れた
 - **ハーフパネル（R3013）で色が乗るのはカードの左側だけ。** 左端から約 43%（約 435 ドット）。黒とオーバーレイは全面
-- 黒に近い色（RGB の最大値が 15% 未満）は黒パネルに回している。グレーの階調に段差が出るので要改善
+- ほぼ黒の無彩色（RGB の各値が 24 未満、差も 24 未満）だけを黒パネルに回し、それ以外は Y/M/C で刷る
 - **黒パネルの網点は、点を散らす誤差拡散だと 60% 前後で真っ黒に潰れる**（樹脂の黒が 1 ドットごとににじむ）。
   点を中心から太らせる 6×6 の網点（50 線）にして、[目盛りカード](tools/make_halftone_cal.py)で測った補正をかけている。
   R3013 の黒パネルで刷って測った結果（指定 % → 見た目の %）:
@@ -161,7 +162,7 @@ cd tools
 この Pebble 4 は、A5013 に載っているコードを小文字ならすべて受け付けた（`Pr` で設定して `Rr;p` で読み戻した）。
 大文字の `Ktc` などは `ERROR PARAMETRES`。
 
-| `Pr` の値 | 本体の表示 | 送るパネル | ドライバ | 実機 |
+| `Pr` の値 | `Rr;p` の返事 | 送るパネル | ドライバ | 実機 |
 |---|---|---|---|---|
 | `k`（`kb` も同じ） | k Black | K | ✅ | ✅ |
 | `ymcko` | ymcko | Y M C K O | ✅ | 未確認 |
@@ -190,8 +191,8 @@ cd tools
 | `Rco;l` | `2` | あと何枚刷れるかの目安（「正確ではない」とある） |
 | `Rrm` | 応答なし | |
 
-**リボンを付け替えたら、利用者がドライバのリボンを合わせる。** 合っていないとカードが詰まることがある
-（ハーフパネルの R3013 に `ymcko` を送ったときは詰まった）。切り替え方:
+**リボンを付け替えたら、利用者がドライバのリボンを合わせる。** 合っていないと、カードが詰まったりリボンが切れたりする
+（ハーフパネルの R3013 に `ymcko` を送ったときは、オーバーレイのリボンがカードに付いてきて、剥がそうとするとリボンが切れた）。切り替え方:
 
 - **印刷ダイアログのプリセット**（おすすめ）: リボンを選んで「プリセット」→「現在の設定をプリセットとして保存」。
   「カラー（ハーフパネル）」「白」などで保存しておけば、プリセットを選ぶだけで切り替わる
@@ -203,7 +204,10 @@ cd tools
 
 ### 印刷ダイアログの用紙サイズ
 
-**印刷ダイアログを開くと、用紙サイズは「その他（210 x 297 mm）」になる。毎回「カード CR80」を選ぶ。**
+**プレビュー.app で PDF を刷るときは、印刷ダイアログの用紙サイズが「その他（210 x 297 mm）」で開く。毎回「カード CR80」を選ぶ。**
+
+**Pages では、書類の「ページ設定」でプリンタ「Evolis Pebble 4」・用紙「カード CR80」を選んでおけばよい**
+（Pages の印刷ダイアログには用紙サイズの欄が無く、書類のページ設定がそのまま使われる）。
 
 - 最初の用紙サイズは、アプリのページ設定（プレビュー.app では macOS 全体の既定の用紙 = A4）から来る。
   このプリンタに A4 は無いので「その他」になる
@@ -214,7 +218,7 @@ cd tools
 - AirPrint（IPP Everywhere）のプリンタとして「セットされている用紙は CR80」（`media-default` / `media-ready`）と
   名乗らせても、プレビュー.app は「その他（210 x 297 mm）」で開いた（`ippeveprinter` でテスト用のプリンタを立てて確認）。
   プリンタ側から最初の用紙を変える手段は無さそうなので、Brother のような印刷ダイアログ拡張（PDE）も作っていない
-- Pages や Word などで、書類のページ設定を「Evolis Pebble 4 / カード CR80」にしておけば、その書類は CR80 で開くはず（未確認）
+- Pages は書類のページ設定の用紙で刷る。Word なども、書類の用紙を CR80 にしておけば同じはず（未確認）
 
 **選び忘れて「その他」のまま刷ると、白紙のカードが 1 枚出ていた。** アプリは A4 のページを作り（カードの絵柄は
 その真ん中）、macOS は用紙だけ CR80 に置き換えて送ってくる（ジョブの `media` は `CR80`）。ラスタには A4 の左下の
@@ -266,24 +270,6 @@ sudo driver/install.sh --uninstall
 テストカードの PDF を `cupsfilter` → `rastertoevolis` に通し、出力のビットマップを画像に戻して、
 向きと位置が元画像と一致することを確かめた。そのうえで、実機の印刷ダイアログからカードが刷れることを確認済み（macOS 27.0.1 / Apple Silicon、USB 接続）。
 
-## 最初にやること
-
-1. ~~USB で Mac に繋ぎ、`system_profiler SPUSBDataType` と `lpinfo -v` で見えるか確認する~~ ✅
-2. ~~双方向に話すために `libusb` を入れる（`brew install libusb`）~~ ✅
-3. ~~**`ESC Rtp` を投げて機種名が返るか**を見る~~ ✅ `Pebble 4` が返った
-4. ~~ラスタ → `Db` の変換~~ ✅ 片面・黒で成功
-5. ~~CUPS から使えるようにする~~ ✅ 印刷ダイアログから印刷できた
-6. ~~カラー（YMCKO）をツールから刷る~~ ✅
-7. ~~CUPS ドライバのカラー対応~~ ✅ 印刷ダイアログでリボンを選べる
-8. ~~コントラスト~~ ✅ 印刷ダイアログで黒とカラーの濃さを選べる
-9. 配布用の pkg
-
-## 進め方のメモ
-
-- **実際にカードを走らせる前には必ず声をかける。** カードとリボンは消耗品
-- 黒単色（K）リボンなら上のコマンド列がそのまま使える。カラー（YMCKO）はパネルごとの送信（`Dbp` / `Sp`）を実機で詰める必要がある
-- 機種は **Pebble 4**（本体で確認済み）。A5013 は "New Pebble" 世代の表なので、`ESC Rtp` の返事で実機との対応を確かめる
-
 ## 参考にした資料とそのライセンス
 
 ドライバ・ツールのコードはすべてこのリポジトリで書いたもので、下の資料からコードは持ち込んでいない。
@@ -291,7 +277,7 @@ sudo driver/install.sh --uninstall
 
 | 資料 | ライセンス | 参考にしたこと |
 |---|---|---|
-| Evolis Card Printers Programming Guide A5013（[Rev.E](https://manualzz.com/doc/1932591/evolis-card-printers-programming-guide-a5013_reve)、[Qu2 版](https://idoc.pub/documents/programming-guide-evolis-qu2-en5k9g7wqpno)） | Evolis 社の著作物 | コマンドの一覧と意味（`Pr` `Pc` `Db` `Rc` など）。文章は転載していない |
+| Evolis Card Printers Programming Guide A5013（[Rev.D2](https://www.yumpu.com/en/document/view/54519120/new-pebble-programming-guide-a5013-revd2/9)、[Qu2 版](https://idoc.pub/documents/programming-guide-evolis-qu2-en5k9g7wqpno)） | Evolis 社の著作物 | コマンドの一覧と意味（`Pr` `Pc` `Db` `Rc` など）。文章は転載していない |
 | [dpavlin/Printer-EVOLIS](https://github.com/dpavlin/Printer-EVOLIS) | GPLv2 以降 | 黒の片面印刷のコマンドの並びと、ビットマップの形（1016×648、90° 回転、1bit） |
 | [qzind/tray](https://github.com/qzind/tray)（`Evolis.java`） | LGPL-2.1 | Y/M/C を 32 段階で送るときのビットの詰め方 |
 | [NEC MultiImpact 700XX の macOS ドライバ](https://github.com/yukino1230/multiimpact-700xx-macos-driver) | MIT（同じ作者） | CUPS フィルタ・PPD・`install.sh` の作り方（同じ作り方で書いた） |
@@ -307,7 +293,7 @@ Evolis、Pebble は Evolis 社の商標または登録商標です。その他�
 このソフトウェアは無保証です（[LICENSE](LICENSE)）。使用によって生じた損害について、作者は責任を負いません。特に次の点に注意してください。
 
 - **カードとリボンは消耗品です。** 設定の誤り（リボンの種類の取り違えなど）や不具合で、カードやリボンが無駄になることがあります
-- **リボンの種類を間違えるとカードが詰まることがあります。** 付いているリボンと、印刷ダイアログのリボンを必ず合わせてください
+- **リボンの種類を間違えると、カードが詰まったりリボンが切れたりします。** 付いているリボンと、印刷ダイアログのリボンを必ず合わせてください
 - 実機で確かめていないリボン（全面パネルの YMCKO、KO、黒以外の単色）は、ガイドの記述からの推測で送っています
 - プリンタ本体の設定（リボンの種類、コントラスト）を書き換えます。メーカーのドライバやソフトに戻すときは、そちらで設定し直してください
 
