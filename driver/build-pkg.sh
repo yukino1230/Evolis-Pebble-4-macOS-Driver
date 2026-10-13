@@ -48,8 +48,9 @@ install -m 644 "$BUILD/Pebble4.ppd" "$ROOT/usr/local/share/evolis/Pebble4.ppd"
 gzip -c "$BUILD/Pebble4.ppd" > "$ROOT/Library/Printers/PPDs/Contents/Resources/EvolisPebble4.ppd.gz"
 chmod 644 "$ROOT/Library/Printers/PPDs/Contents/Resources/EvolisPebble4.ppd.gz"
 
-echo "==> キュー登録コマンドを配置"
+echo "==> キュー登録コマンドと本体の機能を呼ぶコマンドを配置"
 install -m 755 "$HERE/evolis-setup" "$ROOT/usr/local/bin/evolis-setup"
+install -m 755 "$HERE/evolis-tool"  "$ROOT/usr/local/bin/evolis-tool"
 
 echo "==> 拡張属性を除去"
 xattr -cr "$ROOT" 2>/dev/null || true

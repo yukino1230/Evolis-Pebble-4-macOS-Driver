@@ -1,0 +1,36 @@
+#!/bin/bash
+# Evolis Pebble 4 の本体の機能を呼ぶ(印刷キュー経由でコマンドを送るだけ。sudo は要らない)
+#   evolis-tool test       テストカードを刷る(St)
+#   evolis-tool techtest   技術テストカードを刷る(Stt)
+#   evolis-tool clean      クリーニング(Scp)。リボンを外し、クリーニングカードを入れてから
+#   --queue <名前>         キューを指定する(既定: USB の Evolis につながっているキュー)
+set -eu
+QUEUE=""
+ACTION=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --queue) QUEUE="$2"; shift 2 ;;
+    test|techtest|clean) ACTION="$1"; shift ;;
+    *) echo "使い方: evolis-tool [--queue <名前>] test | techtest | clean"; exit 1 ;;
+  esac
+done
+[ -n "$ACTION" ] || { echo "使い方: evolis-tool [--queue <名前>] test | techtest | clean"; exit 1; }
+
+if [ -z "$QUEUE" ]; then
+  # lpstat の文はシステムの言語で変わるので、キューごとに接続先を見る
+  for q in $(lpstat -e 2>/dev/null); do
+    if lpstat -v "$q" 2>/dev/null | grep -q "usb://EVOLIS/"; then QUEUE="$q"; break; fi
+  done
+fi
+[ -n "$QUEUE" ] || { echo "Evolis のキューが見つかりません。--queue で指定してください"; exit 1; }
+
+case "$ACTION" in
+  test)     CMD='St';  WHAT="テストカード" ;;
+  techtest) CMD='Stt'; WHAT="技術テストカード" ;;
+  clean)    CMD='Scp'; WHAT="クリーニング"
+            echo "クリーニングをします。リボンを外し、クリーニングカードをフィーダーに入れてください。"
+            read -r -p "準備ができたら yes と入力: " ok
+            [ "$ok" = "yes" ] || { echo "やめました"; exit 0; } ;;
+esac
+printf '\033%s\r' "$CMD" | lp -d "$QUEUE" -o raw -t "evolis-tool $ACTION" >/dev/null
+echo "$WHAT を $QUEUE に送りました。"

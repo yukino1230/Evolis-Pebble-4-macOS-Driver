@@ -29,6 +29,7 @@ sudo evolis-setup --ribbon k
 | CUPS フィルタ（Intel / Apple Silicon 両対応） | `/usr/local/libexec/cups/filter/rastertoevolis` |
 | PPD | `/Library/Printers/PPDs/Contents/Resources/EvolisPebble4.ppd.gz`、`/usr/local/share/evolis/Pebble4.ppd` |
 | キューの登録コマンド | `/usr/local/bin/evolis-setup` |
+| 本体の機能を呼ぶコマンド | `/usr/local/bin/evolis-tool`（テストカード、技術テストカード、クリーニング） |
 
 **ターミナルを使わずに登録することもできる。** PPD にプリンタの ID（`MFG:EVOLIS;MDL:Pebble`）を書いてあるので、
 「設定」→「プリンタとスキャナ」→「プリンタを追加」で「EVOLIS Pebble」（種類 USB）を選ぶと、ドライバに
@@ -365,6 +366,24 @@ R3314 と R4002 はカーデックスの一覧では PBL-4 用に載っている
   **大きいほど明るくなるように、`20 − 値` を送る**（標準の 10 は 10 のまま）
 - 線画モードでは、見出しの帯やロゴのような濃い色は黒ベタ、明るい色は白になり、網点の上の白抜き文字もくっきり出る
   （以前「60% 以上を黒ベタ」にして既定からは外した処理を、選べる形にしたもの）
+
+### テストカードと `evolis-tool`
+
+本体が持っているテストカードとクリーニングは、pkg に入る `evolis-tool` で呼べる（印刷キュー経由で 1 行のコマンドを送るだけ。
+sudo も Python も要らない。キューは USB の Evolis につながっているものを自動で探す）。
+
+```bash
+evolis-tool test        # テストカード（St）
+evolis-tool techtest    # 技術テストカード（Stt）
+evolis-tool clean       # クリーニング（Scp）。リボンを外し、クリーニングカードを入れてから
+```
+
+- テストカードには Evolis のロゴと機種・シリアル番号などが刷られる。ハーフパネルのリボンだと、ロゴの右側の色は切れる
+- 技術テストカードには、シリアル番号、ヘッドの番号、ファームウェア、印刷位置のオフセット（X-Y-Smart: `17 - 15 - 410`）、
+  **実際に印字する範囲（Printed Lines L/W: `995 L / 636 W`）**、入れたカードの数、クリーニングの回数が刷られる。
+  送っているデータは 1016 × 648 だが、本体が印字するのは 995 ライン × 636 ドット（約 84.2 × 53.8mm）らしい
+- どちらのカードにもシリアル番号などが刷られるので、スキャンを公開するときは注意
+- `evolis-tool clean` はクリーニングカードが無いので実機で試していない
 
 ### クリーニング
 
