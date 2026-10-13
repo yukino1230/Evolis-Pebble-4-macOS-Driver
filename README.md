@@ -30,14 +30,19 @@ sudo evolis-setup --ribbon k
 | PPD | `/Library/Printers/PPDs/Contents/Resources/EvolisPebble4.ppd.gz`、`/usr/local/share/evolis/Pebble4.ppd` |
 | キューの登録コマンド | `/usr/local/bin/evolis-setup` |
 
-PPD にはプリンタの ID（`MFG:EVOLIS;MDL:Pebble`）を書いてあるので、「設定」→「プリンタとスキャナ」→「プリンタを追加」でも
-このドライバが選ばれるはず（未確認）。その場合、エラーのときにプリンタごと止まらないようにする設定（`printer-error-policy=abort-job`）と
-既定のリボンは付かないので、`evolis-setup` で登録するのがおすすめ。
+**ターミナルを使わずに登録することもできる。** PPD にプリンタの ID（`MFG:EVOLIS;MDL:Pebble`）を書いてあるので、
+「設定」→「プリンタとスキャナ」→「プリンタを追加」で「EVOLIS Pebble」（種類 USB）を選ぶと、ドライバに
+「Evolis Pebble 4」が自動で選ばれる（確認済み）。キュー名は `EVOLIS_Pebble` になる。ただし、この方法では次の 2 点が
+`evolis-setup` と違う:
+
+- エラーのとき（用紙サイズの選び忘れなど）、そのジョブだけでなくプリンタごと一時停止する。止めたくなければ
+  `sudo lpadmin -p EVOLIS_Pebble -o printer-error-policy=abort-job`
+- 既定のリボンは黒（`k`）。カラーリボンなら `sudo lpadmin -p EVOLIS_Pebble -o EvolisRibbon=ymckos` などで変えるか、印刷ダイアログで選ぶ
 
 アンインストール:
 
 ```bash
-sudo evolis-setup --remove
+sudo evolis-setup --remove           # システム設定で登録した場合は、そこで削除する
 sudo rm -f /usr/local/libexec/cups/filter/rastertoevolis /usr/local/bin/evolis-setup \
            /Library/Printers/PPDs/Contents/Resources/EvolisPebble4.ppd.gz
 sudo rm -rf /usr/local/share/evolis
