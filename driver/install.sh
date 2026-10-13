@@ -1,21 +1,25 @@
 #!/bin/bash
 # Evolis Pebble 4 用 macOS ドライバのインストール
-#   sudo driver/install.sh [--queue Evolis_Pebble_4] [--uri usb://EVOLIS/Pebble?location=...]
+#   sudo driver/install.sh [--ribbon k|ymcko|ymckos] [--queue Evolis_Pebble_4] [--uri usb://EVOLIS/Pebble?location=...]
+#     --ribbon は印刷ダイアログの既定のリボン(装着しているものに合わせる。既定 k)
 #   sudo driver/install.sh --uninstall
 set -euo pipefail
 
 QUEUE="Evolis_Pebble_4"
 URI=""
+RIBBON="k"
 UNINSTALL=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --queue)     QUEUE="$2"; shift 2 ;;
     --uri)       URI="$2"; shift 2 ;;
+    --ribbon)    RIBBON="$2"; shift 2 ;;
     --uninstall) UNINSTALL=1; shift ;;
     *) echo "不明な引数: $1"; exit 1 ;;
   esac
 done
 
+case "$RIBBON" in k|ymcko|ymckos) ;; *) echo "--ribbon は k / ymcko / ymckos のどれか"; exit 1 ;; esac
 [ "$(id -u)" = "0" ] || { echo "sudo で実行してください"; exit 1; }
 HERE="$(cd "$(dirname "$0")" && pwd)"
 FILTER=/usr/local/libexec/cups/filter/rastertoevolis
@@ -56,7 +60,8 @@ echo "    OK"
 
 echo "==> プリンタキューを登録: $QUEUE"
 lpadmin -p "$QUEUE" -E -v "$URI" -P "$PPD" \
-        -D "Evolis Pebble 4" -L "USB" -o printer-is-shared=false
+        -D "Evolis Pebble 4" -L "USB" -o printer-is-shared=false -o EvolisRibbon="$RIBBON"
+echo "    既定のリボン: $RIBBON"
 
 echo
 echo "完了しました。印刷ダイアログに「Evolis Pebble 4」が出ます。"

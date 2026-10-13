@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evolis Pebble 4（黒リボン・片面）用の PPD を生成する。
+"""Evolis Pebble 4（片面）用の PPD を生成する。
 
 出力は Shift-JIS（PPD 仕様で UTF-8 は使えないため）。
 """
@@ -21,14 +21,14 @@ def main():
     w('*Manufacturer: "Evolis"')
     w('*ModelName: "Evolis Pebble 4"')
     w('*ShortNickName: "Evolis Pebble 4"')
-    w('*NickName: "Evolis Pebble 4 (black ribbon)"')
+    w('*NickName: "Evolis Pebble 4"')
     w('*PCFileName: "PEBBLE4.PPD"')
     w('*Product: "(Pebble 4)"')
     w('*1284DeviceID: "MFG:EVOLIS;MDL:Pebble;"')
     w('*PSVersion: "(3010.000) 0"')
     w('*LanguageLevel: "3"')
-    w('*ColorDevice: False')
-    w('*DefaultColorSpace: Gray')
+    w('*ColorDevice: True')
+    w('*DefaultColorSpace: RGB')
     w('*FileSystem: False')
     w('*Throughput: "1"')
     w('*cupsVersion: 2.3')
@@ -37,11 +37,21 @@ def main():
     # PDF -> CUPSラスタ は macOS 標準の cgpdftoraster が行う(Ghostscript 不要)
     w(f'*cupsFilter: "application/vnd.cups-raster 0 {FILTER}"')
     w('')
+    # 黒リボンでもフィルタが RGB からディザするので、ラスタは常に RGB 8bit
     w('*OpenUI *ColorModel/カラーモード: PickOne')
-    w('*DefaultColorModel: Gray1')
-    w('*ColorModel Gray1/白黒: '
-      '"<</cupsColorSpace 3/cupsBitsPerColor 1/cupsBitsPerPixel 1>>setpagedevice"')
+    w('*DefaultColorModel: RGB')
+    w('*ColorModel RGB/カラー: '
+      '"<</cupsColorSpace 1/cupsBitsPerColor 8/cupsBitsPerPixel 24>>setpagedevice"')
     w('*CloseUI: *ColorModel')
+    w('')
+    # 本体に装着したリボンと合わせる。違うとカードが詰まる
+    w('*OpenUI *EvolisRibbon/リボン: PickOne')
+    w('*OrderDependency: 10 AnySetup *EvolisRibbon')
+    w('*DefaultEvolisRibbon: k')
+    w('*EvolisRibbon k/黒 (モノクロ): ""')
+    w('*EvolisRibbon ymcko/YMCKO カラー (全面パネル): ""')
+    w('*EvolisRibbon ymckos/YMCKO カラー (ハーフパネル R3013 など): ""')
+    w('*CloseUI: *EvolisRibbon')
     w('')
     w('*OpenUI *Resolution/解像度: PickOne')
     w('*DefaultResolution: 300dpi')
