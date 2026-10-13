@@ -51,6 +51,7 @@ ESC Se        CR   シーケンス終了
 | | |
 |---|---|
 | USB | VID `0x0F49` / PID `0x0100`、bcdDevice `0x0602`。インターフェース 0 がプリンタクラス（class 7 / protocol 2 = 双方向、bulk OUT/IN）。CUPS からは `usb://EVOLIS/Pebble?location=20100000` |
+| 別のポート | 挿し直すと CUPS の URI の `location` が変わる（`20100000` → `20200000`）が、キューは古い URI のままで印刷できた（macOS の CUPS がメーカー名と機種名で見つけている）。USB のシリアル番号は空 |
 | 通信 | macOS は class 7 を掴まないので、libusb（pyusb）でそのまま claim できる |
 | 返事の形 | ASCII + `\0` 終端。**次のコマンドを送るまで、IN を読むたびに同じ返事が繰り返し返ってくる**ので最初の `\0` で切る |
 
