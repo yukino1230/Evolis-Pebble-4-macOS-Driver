@@ -84,6 +84,7 @@ static void esc(const char *cmd) { printf("\033%s\r", cmd); }
 #define HALF_W    430      /* ハーフパネル(R3013)で色が乗る幅。左端から。実機で約435 */
 #define K_MAX      24      /* これより暗い無彩色は黒パネルで刷る(文字をくっきりさせる) */
 #define K_CHROMA   24
+#define WHITE_MIN 230      /* これより明るいものは白(網点の白抜きを守る) */
 
 enum { RIB_K, RIB_YMCKO, RIB_YMCKOS };
 
@@ -155,6 +156,24 @@ static void halftone(unsigned char k[CARD_H][CARD_W]) {
             const unsigned char *p = canvas[y][x];
             int v = (299 * p[0] + 587 * p[1] + 114 * p[2] + 500) / 1000;
             k[y][x] = lut[v] > CLUSTER6[y % 6][x % 6];
+        }
+    /* 白のすぐ隣(上下左右と斜め1ドット)には網点を打たない。網点は粗く、樹脂の黒は
+       1ドットぶんにじむので、そのままだと網点の上の白抜き文字が埋まって読めなくなる */
+    static unsigned char white[CARD_H][CARD_W];
+    for (int y = 0; y < CARD_H; y++)
+        for (int x = 0; x < CARD_W; x++) {
+            const unsigned char *p = canvas[y][x];
+            white[y][x] = p[0] >= WHITE_MIN && p[1] >= WHITE_MIN && p[2] >= WHITE_MIN;
+        }
+    for (int y = 0; y < CARD_H; y++)
+        for (int x = 0; x < CARD_W; x++) {
+            if (!k[y][x] || canvas[y][x][0] < K_MAX) continue;   /* 黒(文字など)は削らない */
+            for (int dy = -1; dy <= 1; dy++)
+                for (int dx = -1; dx <= 1; dx++) {
+                    int yy = y + dy, xx = x + dx;
+                    if (yy >= 0 && yy < CARD_H && xx >= 0 && xx < CARD_W && white[yy][xx])
+                        k[y][x] = 0;
+                }
         }
 }
 
