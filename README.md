@@ -8,6 +8,9 @@ Evolis は現行の macOS ドライバを Pebble 世代には出していませ�
 
 **macOS の印刷ダイアログから印刷できます（2026-10-13、macOS 27.0.1 / Apple Silicon で確認）。** 黒（K）リボンと、カラー（YMCKO）リボンのハーフパネル（R3013）で実機確認済みです。ほかのリボン（全面パネルの YMCKO、KO、白・金などの単色）は設定を用意してありますが、実機では試していません。Pebble 4 は片面専用の機種です。
 
+> **非公式のドライバです。** Evolis 社とは関係がなく、同社の承認やサポートは受けていません。
+> 使用は自己責任でお願いします（[下記](#無保証自己責任)）。
+
 ## 分かっていること（2026-10-13 時点の調査）
 
 | | |
@@ -281,6 +284,33 @@ sudo driver/install.sh --uninstall
 - 黒単色（K）リボンなら上のコマンド列がそのまま使える。カラー（YMCKO）はパネルごとの送信（`Dbp` / `Sp`）を実機で詰める必要がある
 - 機種は **Pebble 4**（本体で確認済み）。A5013 は "New Pebble" 世代の表なので、`ESC Rtp` の返事で実機との対応を確かめる
 
-## 参考
+## 参考にした資料とそのライセンス
 
-- [NEC MultiImpact 700XX の macOS ドライバ](https://github.com/yukino1230/multiimpact-700xx-macos-driver) — 同じ作り方（キャプチャと仕様書から自前のフィルタを書く）で作ったドットインパクトプリンタ用ドライバ。CUPS フィルタと PAPPL のプリンタアプリの両方の実装例がある
+ドライバ・ツールのコードはすべてこのリポジトリで書いたもので、下の資料からコードは持ち込んでいない。
+コマンドの仕様やデータの形式（事実）を読んで参考にした。
+
+| 資料 | ライセンス | 参考にしたこと |
+|---|---|---|
+| Evolis Card Printers Programming Guide A5013（[Rev.E](https://manualzz.com/doc/1932591/evolis-card-printers-programming-guide-a5013_reve)、[Qu2 版](https://idoc.pub/documents/programming-guide-evolis-qu2-en5k9g7wqpno)） | Evolis 社の著作物 | コマンドの一覧と意味（`Pr` `Pc` `Db` `Rc` など）。文章は転載していない |
+| [dpavlin/Printer-EVOLIS](https://github.com/dpavlin/Printer-EVOLIS) | GPLv2 以降 | 黒の片面印刷のコマンドの並びと、ビットマップの形（1016×648、90° 回転、1bit） |
+| [qzind/tray](https://github.com/qzind/tray)（`Evolis.java`） | LGPL-2.1 | Y/M/C を 32 段階で送るときのビットの詰め方 |
+| [NEC MultiImpact 700XX の macOS ドライバ](https://github.com/yukino1230/multiimpact-700xx-macos-driver) | MIT（同じ作者） | CUPS フィルタ・PPD・`install.sh` の作り方（同じ作り方で書いた） |
+
+## 非公式・商標について
+
+このソフトウェアは Evolis 社とは関係のない非公式のドライバで、同社の承認・保証・サポートは受けていません。
+Evolis、Pebble は Evolis 社の商標または登録商標です。その他の会社名・製品名は、各社の商標または登録商標です。
+このリポジトリでは、対応機種を示すためにだけ名前を使っています。
+
+## 無保証・自己責任
+
+このソフトウェアは無保証です（[LICENSE](LICENSE)）。使用によって生じた損害について、作者は責任を負いません。特に次の点に注意してください。
+
+- **カードとリボンは消耗品です。** 設定の誤り（リボンの種類の取り違えなど）や不具合で、カードやリボンが無駄になることがあります
+- **リボンの種類を間違えるとカードが詰まることがあります。** 付いているリボンと、印刷ダイアログのリボンを必ず合わせてください
+- 実機で確かめていないリボン（全面パネルの YMCKO、KO、黒以外の単色）は、ガイドの記述からの推測で送っています
+- プリンタ本体の設定（リボンの種類、コントラスト）を書き換えます。メーカーのドライバやソフトに戻すときは、そちらで設定し直してください
+
+## ライセンス
+
+MIT License です。詳しくは [LICENSE](LICENSE) を見てください。
