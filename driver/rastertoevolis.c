@@ -176,6 +176,9 @@ static float tone(const struct tone *t, float want) {
     return 100;
 }
 
+/* 黒パネルの処理。0 = グレー(網点)、1 = 線画(明るさの半分を境に黒ベタか白か。公式ドライバの Line Mode) */
+static int k_line = 0;
+
 static void halftone(unsigned char k[CARD_H][CARD_W], const struct tone *t) {
     /* 色は明るさだけのグレーにして網点で刷る。明るさ -> しきい値と比べる値 (0..36)。
        36 は全部の点を打つ = 黒ベタ(真っ黒な文字など) */
@@ -186,7 +189,7 @@ static void halftone(unsigned char k[CARD_H][CARD_W], const struct tone *t) {
         for (int x = 0; x < CARD_W; x++) {
             const unsigned char *p = canvas[y][x];
             int v = (299 * p[0] + 587 * p[1] + 114 * p[2] + 500) / 1000;
-            k[y][x] = lut[v] > CLUSTER6[y % 6][x % 6];
+            k[y][x] = k_line ? v < 128 : lut[v] > CLUSTER6[y % 6][x % 6];
         }
 }
 
@@ -257,7 +260,8 @@ static void print_card(const struct ribbon *r) {
 }
 
 static const struct ribbon *ribbon = &RIBBONS[0];
-static int contrast_k = 10, contrast_color = 10;   /* Pc の値 0..20、工場出荷時 10 */
+static int contrast_k = 10, contrast_color = 10, contrast_o = 10;   /* Pc の値 0..20、工場出荷時 10 */
+static int brightness = 10;                                         /* Pl の値 0..20、工場出荷時 10 */
 
 static void set_option(const char *key, const char *val) {
     if (!strcmp(key, "EvolisRibbon")) {
@@ -269,10 +273,16 @@ static void set_option(const char *key, const char *val) {
     } else if (!strcmp(key, "EvolisColorLevels")) {
         int v = atoi(val);
         if (v == 32 || v == 64 || v == 128) { levels = v; level_bits = v == 32 ? 5 : v == 64 ? 6 : 7; }
-    } else if (!strcmp(key, "EvolisContrastK") || !strcmp(key, "EvolisContrastColor")) {
+    } else if (!strcmp(key, "EvolisKMode")) {
+        k_line = !strcmp(val, "line");
+    } else if (!strcmp(key, "EvolisContrastK") || !strcmp(key, "EvolisContrastColor") ||
+               !strcmp(key, "EvolisContrastOverlay") || !strcmp(key, "EvolisBrightness")) {
         int v = atoi(val);
         if (v < 0 || v > 20) return;
-        if (!strcmp(key, "EvolisContrastK")) contrast_k = v; else contrast_color = v;
+        if      (!strcmp(key, "EvolisContrastK"))       contrast_k = v;
+        else if (!strcmp(key, "EvolisContrastColor"))   contrast_color = v;
+        else if (!strcmp(key, "EvolisContrastOverlay")) contrast_o = v;
+        else                                            brightness = v;
     }
 }
 
@@ -368,16 +378,24 @@ int main(int argc, char **argv) {
             /* コントラストは本体に残るので、標準(10)でも毎回送る */
             snprintf(cmd, sizeof cmd, "Pc;k;=;%d", contrast_k);
             esc(cmd);
-            if (ribbon->color_w)
+            if (ribbon->color_w) {
                 for (const char *p = "ymc"; *p; p++) {
                     snprintf(cmd, sizeof cmd, "Pc;%c;=;%d", *p, contrast_color);
                     esc(cmd);
                 }
+                snprintf(cmd, sizeof cmd, "Pl;a;=;%d", brightness);   /* Y/M/C の明るさ */
+                esc(cmd);
+            }
+            if (ribbon->overlay) {
+                snprintf(cmd, sizeof cmd, "Pc;o;=;%d", contrast_o);   /* オーバーレイの濃さ */
+                esc(cmd);
+            }
         }
         print_card(ribbon);
-        logmsg("INFO", "カード%d: %ux%u ドット %ubit リボン %s コントラスト 黒%d カラー%d",
-               pages + 1, w, h, bpp, ribbon->name, contrast_k, contrast_color);
-        if (ribbon->overlay) logmsg("INFO", "オーバーレイ %s", overlay_name[overlay_mode]);
+        logmsg("INFO", "カード%d: %ux%u ドット %ubit リボン %s コントラスト 黒%d カラー%d 明るさ%d 黒の処理 %s",
+               pages + 1, w, h, bpp, ribbon->name, contrast_k, contrast_color, brightness,
+               k_line ? "線画" : "グレー");
+        if (ribbon->overlay) logmsg("INFO", "オーバーレイ %s 濃さ%d", overlay_name[overlay_mode], contrast_o);
         pages++;
     }
     if (!pages) {

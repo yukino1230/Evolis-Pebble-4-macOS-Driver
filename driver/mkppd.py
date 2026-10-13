@@ -77,9 +77,19 @@ def main():
     w('*EvolisOverlay magstripe/磁気ストライプを避ける (ISO 7811、裏面用): ""')
     w('*CloseUI: *EvolisOverlay')
     w('')
+    # 黒パネルの処理(黒・単色リボンと、ハーフパネルの右側)。公式ドライバの Gray / Line Mode に当たる
+    w('*OpenUI *EvolisKMode/黒パネルの処理: PickOne')
+    w('*OrderDependency: 13 AnySetup *EvolisKMode')
+    w('*DefaultEvolisKMode: gray')
+    w('*EvolisKMode gray/グレー (網点で濃淡を出す): ""')
+    w('*EvolisKMode line/線画 (黒か白かに分ける): ""')
+    w('*CloseUI: *EvolisKMode')
+    w('')
     # コントラスト (Pc)。本体は 0..20、工場出荷時 10。黒の網点の補正は 10 で測ったもの
     for key, label, order in (("EvolisContrastK", "黒 / 単色リボンの濃さ", 20),
-                              ("EvolisContrastColor", "カラーの濃さ (カラーリボン)", 30)):
+                              ("EvolisContrastColor", "カラーの濃さ (カラーリボン)", 30),
+                              ("EvolisBrightness", "カラーの明るさ (カラーリボン)", 31),
+                              ("EvolisContrastOverlay", "オーバーレイの濃さ", 32)):
         w(f'*OpenUI *{key}/{label}: PickOne')
         w(f'*OrderDependency: {order} AnySetup *{key}')
         w(f'*Default{key}: 10')
