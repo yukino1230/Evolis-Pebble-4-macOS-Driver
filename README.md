@@ -6,7 +6,7 @@ Evolis は現行の macOS ドライバを Pebble 世代には出していませ�
 > Driving the Evolis Pebble 4 ID card printer from macOS. Evolis ships no current macOS driver for
 > this generation, but the printer's command set is documented and the transport is USB printer class.
 
-**macOS の印刷ダイアログから、黒（K）リボンで片面印刷ができます（2026-10-13、macOS 27.0.1 / Apple Silicon で確認）。** カラー（YMCKO）はツールから刷れるところまでで、CUPS ドライバは黒のみです。両面は未対応です。
+**macOS の印刷ダイアログから印刷できます（2026-10-13、macOS 27.0.1 / Apple Silicon で確認）。** 黒（K）リボンと、カラー（YMCKO）リボンのハーフパネル（R3013）で実機確認済みです。全面パネルの YMCKO リボンは設定を用意してありますが、実機では試していません。Pebble 4 は片面専用の機種です。
 
 ## 分かっていること（2026-10-13 時点の調査）
 
@@ -165,7 +165,7 @@ sudo driver/install.sh --uninstall
 4. ~~ラスタ → `Db` の変換~~ ✅ 片面・黒で成功
 5. ~~CUPS から使えるようにする~~ ✅ 印刷ダイアログから印刷できた
 6. ~~カラー（YMCKO）をツールから刷る~~ ✅
-7. CUPS ドライバのカラー対応（リボンの種類を選ぶ、ハーフパネルの範囲外の色の扱い、黒の分け方）
+7. ~~CUPS ドライバのカラー対応~~ ✅ 印刷ダイアログでリボンを選べる
 8. コントラストなどのオプション、配布用の pkg
 
 ## 進め方のメモ
