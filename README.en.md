@@ -106,7 +106,7 @@ holds the printer and the app shows it as busy. Source in [`app/`](app/), built 
 Requires the Xcode command line tools (`xcode-select --install`) and python3.
 
 ```bash
-./driver/build-pkg.sh 1.1              # produces build/pkg/evolis-pebble4-1.1.pkg
+./driver/build-pkg.sh 1.2              # produces build/pkg/evolis-pebble4-1.2.pkg
 sudo driver/install.sh --ribbon k      # build and install in place without a pkg (for development)
 ```
 

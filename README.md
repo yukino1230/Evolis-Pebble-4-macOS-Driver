@@ -89,7 +89,7 @@ USB は macOS 標準の IOUSBHost で直接読み書きする（libusb も Pytho
 Xcode のコマンドラインツール（`xcode-select --install`）と python3 が要る。
 
 ```bash
-./driver/build-pkg.sh 1.1              # build/pkg/evolis-pebble4-1.1.pkg ができる
+./driver/build-pkg.sh 1.2              # build/pkg/evolis-pebble4-1.2.pkg ができる
 sudo driver/install.sh --ribbon k      # pkg を作らずに、その場でビルドして入れる（開発用）
 ```
 
