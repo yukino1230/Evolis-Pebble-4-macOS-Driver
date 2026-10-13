@@ -12,7 +12,7 @@ MM = 72 / 25.4
 W, H = round(85.6 * MM, 2), round(54.0 * MM, 2)   # CR80 (ISO/IEC 7810 ID-1)、横長
 FILTER = "/usr/local/libexec/cups/filter/rastertoevolis"
 
-# Pr に送る値と表示名 (英語, 日本語)。driver/rastertoevolis.c の RIBBONS と合わせる
+# Pr に送る値と表示名 (英語, 日本語)。driver/evolis_card.c の RIBBONS と合わせる
 RIBBONS = [
     ("k", "Black (monochrome)", "黒 (モノクロ)"),
     ("ymcko", "YMCKO color (full panel)", "YMCKO カラー (全面パネル)"),

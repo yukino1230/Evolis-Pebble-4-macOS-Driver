@@ -26,7 +26,7 @@ mkdir -p "$ROOT/usr/local/libexec/cups/filter" "$ROOT/usr/local/bin" "$ROOT/usr/
 
 echo "==> CUPS フィルタをビルド(ユニバーサル)"
 FILTER="$ROOT/usr/local/libexec/cups/filter/rastertoevolis"
-clang -O2 -Wall -arch arm64 -arch x86_64 -o "$FILTER" "$HERE/rastertoevolis.c"
+clang -O2 -Wall -arch arm64 -arch x86_64 -o "$FILTER" "$HERE/rastertoevolis.c" "$HERE/evolis_card.c"
 chmod 755 "$FILTER"
 if [ -n "$SIGN_APP" ]; then
   echo "==> フィルタに署名: $SIGN_APP"

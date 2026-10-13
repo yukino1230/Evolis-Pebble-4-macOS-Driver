@@ -60,7 +60,7 @@ echo "    $URI"
 say "==> Building (universal) and installing the CUPS filter" "==> CUPS フィルタをビルド(ユニバーサル)して設置"
 install -d -o root -g wheel -m 755 /usr/local/libexec/cups/filter "$SHARE"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-clang -O2 -Wall -arch arm64 -arch x86_64 -o "$TMP/rastertoevolis" "$HERE/rastertoevolis.c"
+clang -O2 -Wall -arch arm64 -arch x86_64 -o "$TMP/rastertoevolis" "$HERE/rastertoevolis.c" "$HERE/evolis_card.c"
 install -o root -g wheel -m 755 "$TMP/rastertoevolis" "$FILTER"
 echo "    $FILTER"
 

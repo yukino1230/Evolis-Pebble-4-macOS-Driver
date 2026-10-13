@@ -18,7 +18,7 @@ from reportlab.pdfgen import canvas
 W, H = 85.6 * mm, 54.0 * mm
 DOT = 72 / 300                   # 1 dot at 300 dpi, in points
 OX = 2                           # the filter centers 1011 raster dots in the 1016-dot head
-HALF_W = 430                     # driver/rastertoevolis.c
+HALF_W = 430                     # driver/evolis_card.c
 
 
 def dot_x(d):

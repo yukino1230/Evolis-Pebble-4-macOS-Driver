@@ -113,6 +113,9 @@ sudo driver/install.sh --ribbon k      # build and install in place without a pk
 `build-pkg.sh` signs automatically when a Developer ID certificate is available (otherwise the pkg is unsigned).
 Set `EVOLIS_NOTARY=<notarytool profile name>` to notarize as well.
 
+After changing the filter, run `tests/run.sh` to check that what gets printed has not changed (it compares the bytes sent to the
+printer for 7 test rasters and 22 option combinations). When you change the output on purpose, record it again with `tests/run.sh --update`.
+
 ## Background (research as of 2026-10-13)
 
 | | |
@@ -538,6 +541,30 @@ See [Installation](#installation) to install it.
 
 A test card PDF was run through `cupsfilter` → `rastertoevolis`, and the output bitmap was turned back into an image to check
 orientation and position against the original. Cards were then printed from the real print dialog (macOS 27.0.1 / Apple Silicon, USB).
+
+### When PPDs stop working
+
+Printer drivers that use CUPS PPDs are deprecated and planned for removal in a future CUPS (`lpadmin` prints a warning when the
+queue is registered). After that, printers are expected to be IPP Everywhere devices that need no driver (the same idea as AirPrint),
+and other printers are used through a "Printer Application": a small server on the computer that presents the printer as an IPP
+Everywhere device. macOS 27 ships CUPS 2.3, and PPD drivers still work.
+
+To be ready for that, the code is split in two:
+
+- **[`driver/evolis_card.c`](driver/evolis_card.c)** (core): turns a card RGB image and options into the commands sent to the printer
+  (`Pr` / `Pc` / `Pl` / `Ss`…`Se` / `Db`), including the halftone calibration, half-panel handling and overlay masks.
+  It depends on neither CUPS nor PPDs
+- **[`driver/rastertoevolis.c`](driver/rastertoevolis.c)** (CUPS front end): reads CUPS raster, passes the PPD and print dialog options
+  to the core, and reports errors to the queue
+
+An IPP Everywhere printer receives PWG raster (`image/pwg-raster`), which has the same format as CUPS raster v2, so the current reader
+works as is. A migration would be a Printer Application (for example with [PAPPL](https://www.msweet.org/pappl/), which runs on macOS) that
+
+- accepts PWG raster at 300 dpi, RGB 8-bit, with CR80 as the only media
+- passes each page through `evolis_place` → `evolis_print_card` and sends the result to the printer over USB
+- lets you pick the ribbon and densities in the Printer Application's settings (or Evolis Utility), since the print dialog may not show them
+
+and would print exactly what the driver prints today (comparable with the records of `tests/run.sh`).
 
 ## References and their licenses
 

@@ -1,27 +1,19 @@
 /* CUPS フィルタ: CUPS ラスタ -> Evolis Pebble 4（片面）
  *
  * PDF のラスタライズは macOS 標準の cgpdftoraster が行うため外部依存はない。
- * 依存を作らないため libcups は使わず、ラスタを自前で解析する。
+ * 依存を作らないため libcups は使わず、ラスタを自前で解析する(PWG ラスタも同じ形式で読める)。
  *
- * コマンド (Evolis Card Printers Programming Guide A5013 Rev.E / 実機で確認):
- *   ESC Pr;<ribbon> CR      リボンの種類 (RIBBONS の表)。本体に保存される。
- *                           実際のリボンと違うとカードが詰まる
- *   ESC Ss CR               シーケンス開始（カード1枚）
- *   ESC Sr CR               表面
- *   ESC Db;<p>;<n>;<data> CR パネル p (y/m/c/k/o) のビットマップ。1016x648 ドットのカードを
- *                           時計回りに90°回し、1行 648 ドット x 1016 行。
- *                           n=32/64/128 は 1 ドット 5/6/7bit (インク量, 0 = 塗らない)、n=2 は 1bit (1 = 塗る)。
- *                           どちらもビット単位で隙間なく詰め、MSB が先
- *   ESC Se CR               シーケンス終了（印刷して排出）
+ * ここは CUPS の入口(ラスタの読み取り、PPD と印刷ダイアログのオプション、エラーの表示)だけで、
+ * カードを刷るコマンドを作るところは evolis_card.c にある。
  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
 
+#include "evolis_card.h"
+
 #define HDRSIZE  1796      /* cups_page_header2_t */
-#define CARD_W   1016      /* プリンタが受け取るカード全面（横長, 300dpi） */
-#define CARD_H    648
 
 static FILE *in;
 static int   little, compressed;
@@ -82,219 +74,15 @@ static int unrle(unsigned char *out, unsigned stride, unsigned height, unsigned 
     return 0;
 }
 
-static void esc(const char *cmd) { printf("\033%s\r", cmd); }
-
-/* Y/M/C の階調。Db の段階数 32 / 64 / 128 は 1 ドット 5 / 6 / 7bit。
-   128 の方がグラデーションの段差が小さい(実機で確認)。EvolisColorLevels で変えられる */
-static int levels = 128, level_bits = 7;
-#define HALF_W    430      /* ハーフパネル(R3013)で色が乗る幅。左端から。実機で約435 */
-#define K_MAX      24      /* これより暗い無彩色は黒パネルで刷る(文字をくっきりさせる) */
-#define K_CHROMA   24
-
-/* リボンの種類。color_w は Y/M/C が乗る幅(0 = 単色リボン)、overlay は全面に保護層を乗せるか。
-   単色リボンはどれも k パネル 1 枚で、画像の暗いところにリボンの色が乗る */
-static const struct ribbon {
-    const char *name;       /* Pr に送る値 = PPD の EvolisRibbon の値 */
-    int color_w, overlay;
-} RIBBONS[] = {
-    { "k",      0,      0 },   /* 黒 */
-    { "ymcko",  CARD_W, 1 },   /* YMCKO 全面パネル */
-    { "ymckos", HALF_W, 1 },   /* YMCKO ハーフパネル (R3013 など) */
-    { "ko",     0,      1 },   /* 黒 + オーバーレイ */
-    { "kw",     0,      0 },   /* 白 */
-    { "kr",     0,      0 },   /* 赤 */
-    { "kbl",    0,      0 },   /* 青 */
-    { "kgr",    0,      0 },   /* 緑 */
-    { "kgo",    0,      0 },   /* 金 */
-    { "ksi",    0,      0 },   /* 銀 */
-    { "ksc",    0,      0 },   /* スクラッチ */
-    { "ka",     0,      0 },   /* 黒ワックス */
-};
-#define NRIBBONS (int)(sizeof RIBBONS / sizeof *RIBBONS)
-
-/* カード(横長 1016x648)の RGB。ラスタを中央に置き、縦長なら時計回りに90°回す */
-static unsigned char canvas[CARD_H][CARD_W][3];
-
-static void place(const unsigned char *ras, unsigned w, unsigned h, unsigned stride,
-                  unsigned bpp, unsigned cspace) {
-    int portrait = h > w;
-    unsigned lw = portrait ? h : w, lh = portrait ? w : h;
-    int ox = ((int)CARD_W - (int)lw) / 2, oy = ((int)CARD_H - (int)lh) / 2;
-    /* 1bit: K(3) は 1 = 黒、W(0)/sW(18) は 1 = 白。8bit グレーは W 系なら 255 = 白 */
-    int black_is_one = !(cspace == 0 || cspace == 18);
-
-    memset(canvas, 255, sizeof canvas);
-    for (unsigned ly = 0; ly < lh; ly++) {
-        int cy = (int)ly + oy;
-        if (cy < 0 || cy >= CARD_H) continue;
-        for (unsigned lx = 0; lx < lw; lx++) {
-            int cx = (int)lx + ox;
-            unsigned x = portrait ? ly : lx, y = portrait ? h - 1 - lx : ly;
-            const unsigned char *row = ras + (size_t)y * stride;
-            unsigned char *px;
-            if (cx < 0 || cx >= CARD_W) continue;
-            px = canvas[cy][cx];
-            if (bpp == 1) {
-                int bit = (row[x >> 3] & (0x80u >> (x & 7))) != 0;
-                px[0] = px[1] = px[2] = (bit == black_is_one) ? 0 : 255;
-            } else if (bpp == 8) {
-                unsigned v = row[x];
-                px[0] = px[1] = px[2] = (unsigned char)(cspace == 3 ? 255 - v : v);
-            } else {                                     /* 24bit RGB */
-                memcpy(px, row + x * 3, 3);
-            }
-        }
-    }
-}
-
-/* 黒パネルの網点(黒リボンとハーフパネルの右側)。
- * 樹脂の黒は1ドットがにじむので、誤差拡散のように点を散らすと 60% 前後で真っ黒に潰れる。
- * 点を中心から太らせる 6x6 の網点(300dpi で 50 線)にし、さらに実測の補正をかける。 */
-static const unsigned char CLUSTER6[6][6] = {
-    {32, 25, 17, 18, 26, 33},
-    {24, 12,  5,  6, 13, 27},
-    {16,  4,  0,  1,  7, 19},
-    {23, 11,  3,  2,  8, 20},
-    {31, 15, 10,  9, 14, 28},
-    {35, 30, 22, 21, 29, 34},
-};
-/* 欲しい濃さ -> 網点に指定する濃さ (%)。目盛りカード(tools/make_halftone_cal.py)を刷り、
- * グレースケールでスキャンして測った値を逆に引いたもの。にじみ方がリボンで違うので2つある */
-struct tone { const float *want, *send; unsigned n; };
-/* カラーリボン R3013 の黒パネル (--set methods の G 行、指定^1.6 で測定) */
-static const float COLOR_WANT[] = { 0, 10, 17, 30, 47, 63, 76, 92, 100 };
-static const float COLOR_SEND[] = { 0, 7.6f, 14.6f, 23.1f, 33.0f, 44.1f, 56.5f, 70.0f, 100 };
-/* 黒の単色リボン (--set linear、5% 刻みを4回ずつ測った平均)。単色リボンと KO もこれを使う */
-static const float MONO_WANT[] = { 0, 1.2f, 11.4f, 13.6f, 24.0f, 29.9f, 35.7f, 41.6f, 45.9f, 51.2f, 59.8f,
-                                   65.6f, 74.7f, 77.3f, 81.1f, 87.7f, 91.1f, 95.9f, 96.3f, 99.1f, 100 };
-static const float MONO_SEND[] = { 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50,
-                                   55, 60, 65, 70, 75, 80, 85, 90, 95, 100 };
-static const struct tone TONE_COLOR = { COLOR_WANT, COLOR_SEND, sizeof COLOR_WANT / sizeof *COLOR_WANT };
-static const struct tone TONE_MONO  = { MONO_WANT,  MONO_SEND,  sizeof MONO_WANT / sizeof *MONO_WANT };
-
-static float tone(const struct tone *t, float want) {
-    for (unsigned i = 1; i < t->n; i++)
-        if (want <= t->want[i])
-            return t->send[i-1] + (want - t->want[i-1]) * (t->send[i] - t->send[i-1])
-                                  / (t->want[i] - t->want[i-1]);
-    return 100;
-}
-
-/* 黒パネルの処理。0 = グレー(網点)、1 = 線画(明るさの半分を境に黒ベタか白か。公式ドライバの Line Mode) */
-static int k_line = 0;
-
-static void halftone(unsigned char k[CARD_H][CARD_W], const struct tone *t) {
-    /* 色は明るさだけのグレーにして網点で刷る。明るさ -> しきい値と比べる値 (0..36)。
-       36 は全部の点を打つ = 黒ベタ(真っ黒な文字など) */
-    unsigned char lut[256];
-    for (int v = 0; v < 256; v++)
-        lut[v] = (unsigned char)(tone(t, (255 - v) * 100.0f / 255) * 36 / 100 + 0.5f);
-    for (int y = 0; y < CARD_H; y++)
-        for (int x = 0; x < CARD_W; x++) {
-            const unsigned char *p = canvas[y][x];
-            int v = (299 * p[0] + 587 * p[1] + 114 * p[2] + 500) / 1000;
-            k[y][x] = k_line ? v < 128 : lut[v] > CLUSTER6[y % 6][x % 6];
-        }
-}
-
-/* カードの座標 (x, y) の値を、Db の並び(1行 = x、列 = 下からの y)で bits ずつ詰める */
-static void put_panel(const char *name, int levels, unsigned bits,
-                      const unsigned char plane[CARD_H][CARD_W]) {
-    unsigned acc = 0, n = 0;
-    printf("\033Db;%s;%d;", name, levels);
-    for (int x = 0; x < CARD_W; x++)
-        for (int c = 0; c < CARD_H; c++) {
-            acc = (acc << bits) | plane[CARD_H - 1 - c][x];
-            n += bits;
-            while (n >= 8) { n -= 8; fputc((acc >> n) & 0xff, stdout); }
-        }
-    if (n) fputc((acc << (8 - n)) & 0xff, stdout);
-    fputc('\r', stdout);
-}
-
-/* オーバーレイ(保護層)を乗せる範囲。避ける範囲はカードの表の左上からの mm (カードの規格による)。
-   キャンバスはカード(1011x638)を 1016x648 の中央に置いているので、そのずれを足す */
-enum { OV_FULL, OV_NONE, OV_CHIP, OV_MAG };
-static int overlay_mode = OV_FULL;
-static const char *overlay_name[] = { "full", "none", "chipiso", "magstripe" };
-
-static int mm_x(double mm) { return (int)(mm * 300 / 25.4 + 0.5) + (CARD_W - 1011) / 2; }
-static int mm_y(double mm) { return (int)(mm * 300 / 25.4 + 0.5) + (CARD_H - 638) / 2; }
-
-static int overlay_at(int px, int py) {
-    switch (overlay_mode) {
-    case OV_NONE: return 0;
-    case OV_CHIP:   /* ISO 7816-2 の接点(横 10.25-19.87、縦 19.23-28.55)にモジュールの大きさ分を足す */
-        return !(px >= mm_x(8.5) && px < mm_x(21.5) && py >= mm_y(17.5) && py < mm_y(30.5));
-    case OV_MAG:    /* ISO 7811 の磁気ストライプ(縦 5.54-15.82)に余裕を足す。裏面に刷るとき用 */
-        return !(py >= mm_y(5.0) && py < mm_y(17.6));
-    default: return 1;
-    }
-}
-
-static void print_card(const struct ribbon *r) {
-    static unsigned char y[CARD_H][CARD_W], m[CARD_H][CARD_W], c[CARD_H][CARD_W],
-                         k[CARD_H][CARD_W], o[CARD_H][CARD_W];
-
-    halftone(k, r->color_w ? &TONE_COLOR : &TONE_MONO);   /* カラーリボンの黒パネルか単色リボンか */
-    for (int py = 0; py < CARD_H; py++)
-        for (int px = 0; px < CARD_W; px++) {
-            const unsigned char *p = canvas[py][px];
-            int hi = p[0], lo = p[0];
-            y[py][px] = m[py][px] = c[py][px] = 0;
-            o[py][px] = (unsigned char)overlay_at(px, py);  /* 保護層 */
-            if (px >= r->color_w) continue;               /* 色が乗らない範囲は黒の網点 */
-            for (int i = 1; i < 3; i++) { if (p[i] > hi) hi = p[i]; if (p[i] < lo) lo = p[i]; }
-            k[py][px] = hi < K_MAX && hi - lo < K_CHROMA;
-            if (k[py][px]) continue;
-            c[py][px] = (unsigned char)(((255 - p[0]) * (levels - 1) + 127) / 255);
-            m[py][px] = (unsigned char)(((255 - p[1]) * (levels - 1) + 127) / 255);
-            y[py][px] = (unsigned char)(((255 - p[2]) * (levels - 1) + 127) / 255);
-        }
-    esc("Ss");
-    esc("Sr");
-    if (r->color_w) {
-        put_panel("y", levels, level_bits, y);
-        put_panel("m", levels, level_bits, m);
-        put_panel("c", levels, level_bits, c);
-    }
-    put_panel("k", 2, 1, k);
-    if (r->overlay) put_panel("o", 2, 1, o);
-    esc("Se");
-}
-
-static const struct ribbon *ribbon = &RIBBONS[0];
-static int contrast_k = 10, contrast_color = 10, contrast_o = 10;   /* Pc の値 0..20、工場出荷時 10 */
-static int brightness = 10;   /* 印刷ダイアログの明るさ 0..20 (標準 10)。大きいほど明るい */
-
-static void set_option(const char *key, const char *val) {
-    if (!strcmp(key, "EvolisRibbon")) {
-        for (int i = 0; i < NRIBBONS; i++)
-            if (!strcmp(val, RIBBONS[i].name)) ribbon = &RIBBONS[i];
-    } else if (!strcmp(key, "EvolisOverlay")) {
-        for (int i = 0; i < 4; i++)
-            if (!strcmp(val, overlay_name[i])) overlay_mode = i;
-    } else if (!strcmp(key, "EvolisColorLevels")) {
-        int v = atoi(val);
-        if (v == 32 || v == 64 || v == 128) { levels = v; level_bits = v == 32 ? 5 : v == 64 ? 6 : 7; }
-    } else if (!strcmp(key, "EvolisKMode")) {
-        k_line = !strcmp(val, "line");
-    } else if (!strcmp(key, "EvolisContrastK") || !strcmp(key, "EvolisContrastColor") ||
-               !strcmp(key, "EvolisContrastOverlay") || !strcmp(key, "EvolisBrightness")) {
-        int v = atoi(val);
-        if (v < 0 || v > 20) return;
-        if      (!strcmp(key, "EvolisContrastK"))       contrast_k = v;
-        else if (!strcmp(key, "EvolisContrastColor"))   contrast_color = v;
-        else if (!strcmp(key, "EvolisContrastOverlay")) contrast_o = v;
-        else                                            brightness = v;
-    }
-}
+static evolis_options opt;
+static evolis_canvas canvas;
 
 int main(int argc, char **argv) {
     unsigned char magic[4];
     int pages = 0, npages = 0;    /* 刷ったカードの数 / 受け取ったページの数 */
 
     lang_ja = getenv("LANG") && !strncmp(getenv("LANG"), "ja", 2);
+    evolis_default_options(&opt);
     if (argc < 6) { logmsg("ERROR", T("Not enough arguments", "引数が足りません")); return 1; }
     /* ジョブに指定がなければ、キューの PPD の既定値を使う。CUPS はダイアログで既定のまま
        にしたオプションを argv[5] に入れないので、これを読まないと黒リボン扱いになり、
@@ -304,7 +92,7 @@ int main(int argc, char **argv) {
         char line[256], key[64], val[32];
         while (ppd && fgets(line, sizeof line, ppd))
             if (sscanf(line, "*Default%63[A-Za-z]: %31s", key, val) == 2)
-                set_option(key, val);
+                evolis_set_option(&opt, key, val);
         if (ppd) fclose(ppd);
     }
     /* argv[5] は "key=value key=value ..." */
@@ -312,7 +100,7 @@ int main(int argc, char **argv) {
         char *o = strdup(argv[5]), *tok, *sp = NULL;
         for (tok = strtok_r(o, " \t", &sp); tok; tok = strtok_r(NULL, " \t", &sp)) {
             char *eq = strchr(tok, '='); if (!eq) continue; *eq = 0;
-            set_option(tok, eq + 1);
+            evolis_set_option(&opt, tok, eq + 1);
         }
     }
     in = (argc > 6) ? fopen(argv[6], "rb") : stdin;
@@ -362,52 +150,27 @@ int main(int argc, char **argv) {
         if (compressed) unrle(ras, stride, h, bpp);
         else            readn(ras, (size_t)stride * h);
 
-        place(ras, w, h, stride, bpp, cspace);
+        evolis_place(canvas, ras, w, h, stride, bpp, cspace);
         free(ras);
         npages++;
 
         /* 真っ白なページは刷らない。印刷ダイアログで用紙サイズを CR80 にし忘れると、アプリは
            A4 のページを作り、macOS は用紙だけ CR80 に置き換えて送ってくる。ラスタには A4 の
            左下のカード1枚分が切り出されて真っ白になり、白紙のカードが1枚出てしまう */
-        {
-            const unsigned char *c = &canvas[0][0][0];
-            size_t n = sizeof canvas, i = 0;
-            while (i < n && c[i] == 255) i++;
-            if (i == n) {
-                logmsg("WARNING", T("Page %d is blank and is not printed", "ページ%d は真っ白なので刷りません"), npages);
-                continue;
-            }
+        if (evolis_canvas_blank(canvas)) {
+            logmsg("WARNING", T("Page %d is blank and is not printed", "ページ%d は真っ白なので刷りません"), npages);
+            continue;
         }
 
-        if (pages == 0) {
-            char cmd[16];
-            snprintf(cmd, sizeof cmd, "Pr;%s", ribbon->name);
-            esc(cmd);
-            /* コントラストは本体に残るので、標準(10)でも毎回送る */
-            snprintf(cmd, sizeof cmd, "Pc;k;=;%d", contrast_k);
-            esc(cmd);
-            if (ribbon->color_w) {
-                for (const char *p = "ymc"; *p; p++) {
-                    snprintf(cmd, sizeof cmd, "Pc;%c;=;%d", *p, contrast_color);
-                    esc(cmd);
-                }
-                /* 本体の Pl (Luminosity) は値を上げるほど色が暗く(濃く)なる(実機で確認)。
-                   ダイアログの「明るさ」は名前どおり上げると明るくなるように、逆にして送る */
-                snprintf(cmd, sizeof cmd, "Pl;a;=;%d", 20 - brightness);
-                esc(cmd);
-            }
-            if (ribbon->overlay) {
-                snprintf(cmd, sizeof cmd, "Pc;o;=;%d", contrast_o);   /* オーバーレイの濃さ */
-                esc(cmd);
-            }
-        }
-        print_card(ribbon);
+        if (pages == 0) evolis_job_start(stdout, &opt);
+        evolis_print_card(stdout, &opt, canvas);
         logmsg("INFO", T("Card %d: %ux%u dots %ubit ribbon %s density black %d color %d brightness %d black panel %s",
                          "カード%d: %ux%u ドット %ubit リボン %s コントラスト 黒%d カラー%d 明るさ%d 黒の処理 %s"),
-               pages + 1, w, h, bpp, ribbon->name, contrast_k, contrast_color, brightness,
-               k_line ? T("line art", "線画") : T("gray", "グレー"));
-        if (ribbon->overlay)
-            logmsg("INFO", T("Overlay %s density %d", "オーバーレイ %s 濃さ%d"), overlay_name[overlay_mode], contrast_o);
+               pages + 1, w, h, bpp, evolis_ribbon_name(opt.ribbon), opt.contrast_k, opt.contrast_color,
+               opt.brightness, opt.k_line ? T("line art", "線画") : T("gray", "グレー"));
+        if (evolis_ribbon_has_overlay(opt.ribbon))
+            logmsg("INFO", T("Overlay %s density %d", "オーバーレイ %s 濃さ%d"),
+                   evolis_overlay_name(opt.overlay), opt.contrast_o);
         pages++;
     }
     if (!pages) {
@@ -419,7 +182,6 @@ int main(int argc, char **argv) {
             logmsg("ERROR", T("No pages", "ページがありません"));
         return 1;
     }
-    for (int i = 0; i < 64; i++) fputc(0, stdout);   /* 参考実装に合わせた末尾の詰め物 */
-    fflush(stdout);
+    evolis_job_end(stdout);
     return 0;
 }

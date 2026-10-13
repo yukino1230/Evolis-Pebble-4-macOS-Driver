@@ -96,6 +96,9 @@ sudo driver/install.sh --ribbon k      # pkg を作らずに、その場でビ�
 `build-pkg.sh` は Developer ID 証明書があれば自動で署名する（無ければ未署名のまま作る）。
 `EVOLIS_NOTARY=<notarytool のプロファイル名>` を付けると公証まで行う。
 
+フィルタを変えたら `tests/run.sh` で、刷られる内容が変わっていないかを確かめる（テスト用のラスタ 7 種類とオプションの組み合わせ 22 通りで、
+プリンタに送るバイト列を前と比べる）。刷り方を意図して変えたときは `tests/run.sh --update` で記録し直す。
+
 ## 分かっていること（2026-10-13 時点の調査）
 
 | | |
@@ -516,6 +519,30 @@ libcups にも Ghostscript にも依存しない。
 
 テストカードの PDF を `cupsfilter` → `rastertoevolis` に通し、出力のビットマップを画像に戻して、
 向きと位置が元画像と一致することを確かめた。そのうえで、実機の印刷ダイアログからカードが刷れることを確認済み（macOS 27.0.1 / Apple Silicon、USB 接続）。
+
+### PPD が使えなくなったとき
+
+CUPS の PPD を使うドライバは、将来の CUPS で廃止される予定になっている（キューを登録すると `lpadmin` が警告を出す）。
+その後のプリンタは、ドライバを入れずに使える IPP Everywhere（AirPrint と同じ仕組み）の機器になり、
+そうでないプリンタは「Printer Application」（パソコンの中で動き、IPP Everywhere の機器のふりをする小さなサーバ）で使う形になる見込み。
+今の macOS 27 は CUPS 2.3 で、PPD のドライバはまだ使える。
+
+そのときのために、作りを次のように分けてある:
+
+- **[`driver/evolis_card.c`](driver/evolis_card.c)**（コア）: カードの RGB 画像とオプションから、プリンタに送るコマンド
+  （`Pr` / `Pc` / `Pl` / `Ss`〜`Se` / `Db`）を作る。網点の補正、ハーフパネル、オーバーレイの範囲もここ。
+  CUPS にも PPD にも頼らない
+- **[`driver/rastertoevolis.c`](driver/rastertoevolis.c)**（CUPS の入口）: CUPS ラスタを読み、PPD と印刷ダイアログのオプションを
+  コアに渡し、エラーをキューに出すだけ
+
+IPP Everywhere のプリンタに届くのは PWG ラスタ（`image/pwg-raster`）で、CUPS ラスタ v2 と同じ形式なので、今の読み取りがそのまま使える。
+移るときは、Printer Application（たとえば macOS でも動く [PAPPL](https://www.msweet.org/pappl/)）を作り、
+
+- 受け取る形式: PWG ラスタ、300dpi、RGB 8bit。用紙は CR80 だけ
+- 受け取ったページを `evolis_place` → `evolis_print_card` に通し、USB でプリンタに送る
+- リボンや濃さは、印刷ダイアログに出せないかもしれないので、Printer Application の設定（または Evolis Utility）で選ぶ
+
+とすれば、刷る内容は今と同じになる（`tests/run.sh` の記録と比べられる）。
 
 ## 参考にした資料とそのライセンス
 
