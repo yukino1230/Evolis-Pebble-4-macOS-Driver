@@ -186,9 +186,11 @@ cd tools
 | `ymcko` | ymcko | R3011（200 枚） | Y M C K O | ✅ | 未確認 |
 | `ymckos` | ymckos | R3013 ハーフパネル（400 枚） | Y M C K O（Y/M/C は左側だけ） | ✅ | ✅ |
 | `ko` | ko | R3012 黒＋オーバーコート（500 枚） | K O | ✅ | 未確認 |
-| `ymckok` | ymckok | R3314（200 枚、両面機専用） | — | 見送り（2 つ目の K は両面機の裏面用。片面の Pebble 4 では使わない） | |
-| `h` `ho` | h | R4002 ホログラム（350 枚） | — | 見送り（データの形が不明） | |
+| `ymckok` | ymckok | R3314（200 枚）。**Pebble 非対応**（[データシート](https://fr.evolis.com/wp-content/uploads/2024/01/datasheet-ymckok-eng.pdf)の対応機種は SECURION / QUANTUM2） | — | 見送り | |
+| `h` `ho` | h | R4002 ホログラム（350 枚）。**Pebble 非対応**（[データシート](https://fr.evolis.com/wp-content/uploads/2026/03/datasheet-generic-holo-varnish-eng.pdf)の対応機種は QUANTUM2 / SECURION） | — | 見送り | |
 | `ktc` `ktp` | k Direct Thermal Card / Paper | リボンを使わない | — | 見送り（専用カードに直接刷る） | |
+
+R3314 と R4002 はカーデックスの一覧では PBL-4 用に載っているが、上のとおり Evolis のデータシートでは Pebble 用になっていない。
 
 カーデックスの一覧の PBL-4 用には、ほかに次の 2 つがある。Evolis のデータシートで確かめた:
 
