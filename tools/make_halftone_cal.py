@@ -5,7 +5,9 @@ Right of the half-panel boundary, each row is an 11-step wedge (0..100 %
 nominal coverage) rendered with one halftone method and tone curve, to find
 a setting that survives resin dot gain. Row labels are drawn on the left.
 
-Usage: make_halftone_cal.py [--ribbon ymckos] [--preview out.png] [--out job.bin] [--send]
+Usage: make_halftone_cal.py [--set methods|linear] [--ribbon ymckos] [--preview out.png] [--out job.bin] [--send]
+  --set methods  compare halftone methods and tone curves (the first card)
+  --set linear   6x6 cluster with no curve at 5 % steps, 4 times, to build a tone table
 """
 import argparse
 
@@ -54,19 +56,24 @@ def ordered(cov, matrix, y0, x0):
     return cov > thr
 
 
-ROWS = [
-    ("A  diffusion  as is (now)", "fs", 1.0),
-    ("B  diffusion  ^1.6", "fs", 1.6),
-    ("C  diffusion  ^2.2", "fs", 2.2),
-    ("D  cluster4  as is", "c4", 1.0),
-    ("E  cluster4  ^1.6", "c4", 1.6),
-    ("F  cluster4  ^2.2", "c4", 2.2),
-    ("G  cluster6  ^1.6", "c6", 1.6),
-    ("H  cluster6  ^2.2", "c6", 2.2),
-]
+# (label, method, gamma, offset %): step s prints ((s * 10 + offset) / 100) ** gamma
+SETS = {
+    "methods": [
+        ("A  diffusion  as is (now)", "fs", 1.0, 0),
+        ("B  diffusion  ^1.6", "fs", 1.6, 0),
+        ("C  diffusion  ^2.2", "fs", 2.2, 0),
+        ("D  cluster4  as is", "c4", 1.0, 0),
+        ("E  cluster4  ^1.6", "c4", 1.6, 0),
+        ("F  cluster4  ^2.2", "c4", 2.2, 0),
+        ("G  cluster6  ^1.6", "c6", 1.6, 0),
+        ("H  cluster6  ^2.2", "c6", 2.2, 0),
+    ],
+    "linear": [(f"{'ABCDEFGH'[i]}  cluster6  +{5 * (i % 2)}%", "c6", 1.0, 5 * (i % 2))
+               for i in range(8)],
+}
 
 
-def build():
+def build(rows):
     k = np.zeros((CARD_H, CARD_W), dtype=bool)          # card coords [y][x]
     label = Image.new("1", (CARD_W, CARD_H), 0)
     d = ImageDraw.Draw(label)
@@ -75,12 +82,12 @@ def build():
     matrices = {"c4": cluster(4), "c6": cluster(6)}
     for s in range(STEPS):
         d.text((X0 + s * STEP_W + STEP_W // 2, 2), f"{s * 10}", font=small, fill=1, anchor="mt")
-    for r, (name, method, gamma) in enumerate(ROWS):
+    for r, (name, method, gamma, offset) in enumerate(rows):
         y = Y0 + r * (ROW_H + ROW_GAP)
         d.text((20, y + ROW_H // 2), name, font=font, fill=1, anchor="lm")
         for s in range(STEPS):
             x = X0 + s * STEP_W
-            cov = np.full((ROW_H, STEP_W - 4), (s / 10) ** gamma)
+            cov = np.full((ROW_H, STEP_W - 4), min(1, (s * 10 + offset) / 100) ** gamma)
             dots = fs(cov) if method == "fs" else ordered(cov, matrices[method], y, x)
             k[y:y + ROW_H, x:x + STEP_W - 4] = dots
     k |= np.asarray(label, dtype=bool)
@@ -90,7 +97,8 @@ def build():
 def job(k, ribbon):
     head = np.rot90(k, -1)                  # card [y][x] -> head line x, dot (647 - y)
     zeros = np.zeros(head.shape, dtype=np.uint8)
-    parts = [esc(b"Pr;" + ribbon.encode()), esc(b"Ss"), esc(b"Sr")]
+    # contrast is kept in the printer; measure at the factory default
+    parts = [esc(b"Pr;" + ribbon.encode()), esc(b"Pc;k;=;10"), esc(b"Ss"), esc(b"Sr")]
     if ribbon != "k":
         parts += [esc(b"Db;%s;32;" % p + pack(zeros, 5)) for p in (b"y", b"m", b"c")]
     parts.append(esc(b"Db;k;2;" + pack(head, 1)))
@@ -102,12 +110,13 @@ def job(k, ribbon):
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--set", choices=sorted(SETS), default="methods")
     ap.add_argument("--ribbon", choices=["k", "ymcko", "ymckos"], default="ymckos")
     ap.add_argument("--preview")
     ap.add_argument("--out")
     ap.add_argument("--send", action="store_true")
     args = ap.parse_args()
-    k = build()
+    k = build(SETS[args.set])
     if args.preview:
         Image.fromarray(~k).save(args.preview)
     data = job(k, args.ribbon)

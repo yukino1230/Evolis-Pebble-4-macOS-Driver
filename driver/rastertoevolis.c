@@ -152,25 +152,34 @@ static const unsigned char CLUSTER6[6][6] = {
     {31, 15, 10,  9, 14, 28},
     {35, 30, 22, 21, 29, 34},
 };
-/* 欲しい濃さ -> 網点に指定する濃さ (%)。目盛りカード(tools/make_halftone_cal.py)の
- * G 行をカラーリボン R3013 の黒パネルで刷って測った値を逆に引いたもの */
-static const float TONE_WANT[] = { 0, 10, 17, 30, 47, 63, 76, 92, 100 };
-static const float TONE_SEND[] = { 0, 7.6f, 14.6f, 23.1f, 33.0f, 44.1f, 56.5f, 70.0f, 100 };
+/* 欲しい濃さ -> 網点に指定する濃さ (%)。目盛りカード(tools/make_halftone_cal.py)を刷り、
+ * グレースケールでスキャンして測った値を逆に引いたもの。にじみ方がリボンで違うので2つある */
+struct tone { const float *want, *send; unsigned n; };
+/* カラーリボン R3013 の黒パネル (--set methods の G 行、指定^1.6 で測定) */
+static const float COLOR_WANT[] = { 0, 10, 17, 30, 47, 63, 76, 92, 100 };
+static const float COLOR_SEND[] = { 0, 7.6f, 14.6f, 23.1f, 33.0f, 44.1f, 56.5f, 70.0f, 100 };
+/* 黒の単色リボン (--set linear、5% 刻みを4回ずつ測った平均)。単色リボンと KO もこれを使う */
+static const float MONO_WANT[] = { 0, 1.2f, 11.4f, 13.6f, 24.0f, 29.9f, 35.7f, 41.6f, 45.9f, 51.2f, 59.8f,
+                                   65.6f, 74.7f, 77.3f, 81.1f, 87.7f, 91.1f, 95.9f, 96.3f, 99.1f, 100 };
+static const float MONO_SEND[] = { 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50,
+                                   55, 60, 65, 70, 75, 80, 85, 90, 95, 100 };
+static const struct tone TONE_COLOR = { COLOR_WANT, COLOR_SEND, sizeof COLOR_WANT / sizeof *COLOR_WANT };
+static const struct tone TONE_MONO  = { MONO_WANT,  MONO_SEND,  sizeof MONO_WANT / sizeof *MONO_WANT };
 
-static float tone(float want) {
-    for (unsigned i = 1; i < sizeof TONE_WANT / sizeof *TONE_WANT; i++)
-        if (want <= TONE_WANT[i])
-            return TONE_SEND[i-1] + (want - TONE_WANT[i-1]) * (TONE_SEND[i] - TONE_SEND[i-1])
-                                    / (TONE_WANT[i] - TONE_WANT[i-1]);
+static float tone(const struct tone *t, float want) {
+    for (unsigned i = 1; i < t->n; i++)
+        if (want <= t->want[i])
+            return t->send[i-1] + (want - t->want[i-1]) * (t->send[i] - t->send[i-1])
+                                  / (t->want[i] - t->want[i-1]);
     return 100;
 }
 
-static void halftone(unsigned char k[CARD_H][CARD_W]) {
+static void halftone(unsigned char k[CARD_H][CARD_W], const struct tone *t) {
     /* 色は明るさだけのグレーにして網点で刷る。明るさ -> しきい値と比べる値 (0..36)。
        36 は全部の点を打つ = 黒ベタ(真っ黒な文字など) */
     unsigned char lut[256];
     for (int v = 0; v < 256; v++)
-        lut[v] = (unsigned char)(tone((255 - v) * 100.0f / 255) * 36 / 100 + 0.5f);
+        lut[v] = (unsigned char)(tone(t, (255 - v) * 100.0f / 255) * 36 / 100 + 0.5f);
     for (int y = 0; y < CARD_H; y++)
         for (int x = 0; x < CARD_W; x++) {
             const unsigned char *p = canvas[y][x];
@@ -198,7 +207,7 @@ static void print_card(const struct ribbon *r) {
     static unsigned char y[CARD_H][CARD_W], m[CARD_H][CARD_W], c[CARD_H][CARD_W],
                          k[CARD_H][CARD_W], o[CARD_H][CARD_W];
 
-    halftone(k);
+    halftone(k, r->color_w ? &TONE_COLOR : &TONE_MONO);   /* カラーリボンの黒パネルか単色リボンか */
     for (int py = 0; py < CARD_H; py++)
         for (int px = 0; px < CARD_W; px++) {
             const unsigned char *p = canvas[py][px];
