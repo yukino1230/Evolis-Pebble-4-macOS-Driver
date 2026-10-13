@@ -122,25 +122,40 @@ static void place(const unsigned char *ras, unsigned w, unsigned h, unsigned str
     }
 }
 
-/* 明るさを Floyd-Steinberg で 1bit にする(黒リボンとハーフパネルの右側) */
-static void dither(unsigned char k[CARD_H][CARD_W]) {
-    static float err[2][CARD_W + 2];
-    memset(err, 0, sizeof err);
-    for (int y = 0; y < CARD_H; y++) {
-        float *cur = err[y & 1] + 1, *nxt = err[(y + 1) & 1] + 1;
-        memset(nxt - 1, 0, sizeof err[0]);
+/* 黒パネルの網点(黒リボンとハーフパネルの右側)。
+ * 樹脂の黒は1ドットがにじむので、誤差拡散のように点を散らすと 60% 前後で真っ黒に潰れる。
+ * 点を中心から太らせる 6x6 の網点(300dpi で 50 線)にし、さらに実測の補正をかける。 */
+static const unsigned char CLUSTER6[6][6] = {
+    {32, 25, 17, 18, 26, 33},
+    {24, 12,  5,  6, 13, 27},
+    {16,  4,  0,  1,  7, 19},
+    {23, 11,  3,  2,  8, 20},
+    {31, 15, 10,  9, 14, 28},
+    {35, 30, 22, 21, 29, 34},
+};
+/* 欲しい濃さ -> 網点に指定する濃さ (%)。目盛りカード(tools/make_halftone_cal.py)の
+ * G 行をカラーリボン R3013 の黒パネルで刷って測った値を逆に引いたもの */
+static const float TONE_WANT[] = { 0, 10, 17, 30, 47, 63, 76, 92, 100 };
+static const float TONE_SEND[] = { 0, 7.6f, 14.6f, 23.1f, 33.0f, 44.1f, 56.5f, 70.0f, 100 };
+
+static float tone(float want) {
+    for (unsigned i = 1; i < sizeof TONE_WANT / sizeof *TONE_WANT; i++)
+        if (want <= TONE_WANT[i])
+            return TONE_SEND[i-1] + (want - TONE_WANT[i-1]) * (TONE_SEND[i] - TONE_SEND[i-1])
+                                    / (TONE_WANT[i] - TONE_WANT[i-1]);
+    return 100;
+}
+
+static void halftone(unsigned char k[CARD_H][CARD_W]) {
+    unsigned char lut[256];                  /* 明るさ -> 網点のしきい値と比べる値 (0..36) */
+    for (int v = 0; v < 256; v++)
+        lut[v] = (unsigned char)(tone((255 - v) * 100.0f / 255) * 36 / 100 + 0.5f);
+    for (int y = 0; y < CARD_H; y++)
         for (int x = 0; x < CARD_W; x++) {
             const unsigned char *p = canvas[y][x];
-            float v = 0.299f * p[0] + 0.587f * p[1] + 0.114f * p[2] + cur[x];
-            float e;
-            k[y][x] = v < 128;
-            e = v - (k[y][x] ? 0 : 255);
-            cur[x + 1] += e * 7 / 16;
-            nxt[x - 1] += e * 3 / 16;
-            nxt[x]     += e * 5 / 16;
-            nxt[x + 1] += e * 1 / 16;
+            int v = (299 * p[0] + 587 * p[1] + 114 * p[2] + 500) / 1000;
+            k[y][x] = lut[v] > CLUSTER6[y % 6][x % 6];
         }
-    }
 }
 
 /* カードの座標 (x, y) の値を、Db の並び(1行 = x、列 = 下からの y)で bits ずつ詰める */
@@ -162,7 +177,7 @@ static void print_card(int ribbon) {
     static unsigned char y[CARD_H][CARD_W], m[CARD_H][CARD_W], c[CARD_H][CARD_W],
                          k[CARD_H][CARD_W], o[CARD_H][CARD_W];
 
-    dither(k);
+    halftone(k);
     if (ribbon != RIB_K) {
         int color_w = ribbon == RIB_YMCKOS ? HALF_W : CARD_W;
         for (int py = 0; py < CARD_H; py++)
