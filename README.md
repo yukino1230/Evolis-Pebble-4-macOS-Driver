@@ -6,7 +6,7 @@ Evolis は現行の macOS ドライバを Pebble 世代には出していませ�
 > Driving the Evolis Pebble 4 ID card printer from macOS. Evolis ships no current macOS driver for
 > this generation, but the printer's command set is documented and the transport is USB printer class.
 
-**黒（K）リボンで片面印刷ができました（2026-10-13）。** CUPS ドライバを書いたところで、印刷ダイアログからの印刷はまだ実機で試していません。
+**macOS の印刷ダイアログから、黒（K）リボンで片面印刷ができます（2026-10-13、macOS 27.0.1 / Apple Silicon で確認）。** カラー（YMCKO）リボンと両面は未対応です。
 
 ## 分かっていること（2026-10-13 時点の調査）
 
@@ -92,7 +92,7 @@ cd tools
 ../.venv/bin/python evolis_print.py /tmp/testcard.png --send
 ```
 
-## CUPS ドライバ（実機の印刷ダイアログからは未検証）
+## CUPS ドライバ
 
 [`driver/`](driver/) に、印刷ダイアログから使うための CUPS フィルタと PPD がある。
 [MultiImpact 700XX のドライバ](https://github.com/yukino1230/multiimpact-700xx-macos-driver)と同じ作りで、
@@ -113,7 +113,7 @@ sudo driver/install.sh --uninstall
 ```
 
 テストカードの PDF を `cupsfilter` → `rastertoevolis` に通し、出力のビットマップを画像に戻して、
-向きと位置が元画像と一致することまでは確かめた。
+向きと位置が元画像と一致することを確かめた。そのうえで、実機の印刷ダイアログからカードが刷れることを確認済み（macOS 27.0.1 / Apple Silicon、USB 接続）。
 
 ## 最初にやること
 
@@ -121,7 +121,8 @@ sudo driver/install.sh --uninstall
 2. ~~双方向に話すために `libusb` を入れる（`brew install libusb`）~~ ✅
 3. ~~**`ESC Rtp` を投げて機種名が返るか**を見る~~ ✅ `Pebble 4` が返った
 4. ~~ラスタ → `Db` の変換~~ ✅ 片面・黒で成功
-5. CUPS から使えるようにする → CUPS フィルタを書いた。**印刷ダイアログからの実機テストが残っている**
+5. ~~CUPS から使えるようにする~~ ✅ 印刷ダイアログから印刷できた
+6. カラー（YMCKO）リボン、コントラストなどのオプション、配布用の pkg
 
 ## 進め方のメモ
 
