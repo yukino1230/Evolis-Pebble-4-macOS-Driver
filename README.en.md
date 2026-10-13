@@ -305,7 +305,7 @@ for the Pebble PBL-4, as of 2026-10-13.
 | `kgo` | k Gold | R2016 gold (1,000) | K | ✅ | not yet |
 | `ksi` | k Silver | R2017 silver (1,000) | K | ✅ | not yet |
 | `ksc` | k Scratch | R2018 scratch-off (1,000) | K | ✅ | not yet |
-| `ka` | k Wax Plastic | not in the list | K | ✅ | not yet |
+| `ka` | k Wax Plastic | not in the list (none found for the Pebble; see below) | K | ✅ | not yet |
 | `ymcko` | ymcko | R3011 (200) | Y M C K O | ✅ | not yet |
 | `ymckos` | ymckos | R3013 half panel (400) | Y M C K O (Y/M/C only on the left) | ✅ | ✅ |
 | `ko` | ko | R3012 black + overcoat (500) | K O | ✅ | not yet |
@@ -323,6 +323,11 @@ The Cardex PBL-4 list has two more ribbons, checked against the Evolis datasheet
 - **R2029 BlackFLEX** ([datasheet](https://www.evolis.com/wp-content/uploads/2023/04/datasheet-blackflex-eng.pdf)):
   a black single-color ribbon for ABS, PET, PC, rough PVC and paper cards. **The datasheet lists only SECURION and QUANTUM2,
   not the Pebble** (unlike the Cardex list). Its use is close to `ka` (black wax for ABS and similar cards), but the `Pr` value is unknown
+
+For black wax (`ka`, `k Wax Plastic`), the ribbon found is **R2139 BlackWAX** (3,000 prints), but resellers list it for the
+Quantum 2 (some also for the original Quantum), not the Pebble, and Pebble ribbons are 1,000-print rolls. Some resellers mark it
+discontinued with no replacement while others still list it, so it is unclear whether it can still be bought (as of 2026-10).
+No black wax ribbon for the Pebble was found, so `ka` is accepted only because A5013 lists it and is probably never needed.
 
 Both datasheets say single-color ribbons are continuous ribbons with a "ribbon saver" feature that uses only the printed area
 plus 7 mm (a printer-side feature).
