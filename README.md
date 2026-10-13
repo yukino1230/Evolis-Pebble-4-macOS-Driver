@@ -1,5 +1,7 @@
 # Evolis Pebble 4 を macOS から使う
 
+[English README](README.en.md)
+
 ID カードプリンタ **Evolis Pebble 4** を macOS から印刷できるようにする試みです。
 Evolis は現行の macOS ドライバを Pebble 世代には出していません（互換性表に Pebble の行が無い）。
 
@@ -78,7 +80,7 @@ USB は macOS 標準の IOUSBHost で直接読み書きする（libusb も Pytho
 Xcode のコマンドラインツール（`xcode-select --install`）と python3 が要る。
 
 ```bash
-./driver/build-pkg.sh 1.0              # build/pkg/evolis-pebble4-1.0.pkg ができる
+./driver/build-pkg.sh 1.1              # build/pkg/evolis-pebble4-1.1.pkg ができる
 sudo driver/install.sh --ribbon k      # pkg を作らずに、その場でビルドして入れる（開発用）
 ```
 
@@ -487,7 +489,7 @@ libcups にも Ghostscript にも依存しない。
 | | |
 |---|---|
 | 用紙 | CR80（85.6×54mm、横長）。縁なしでカード全面に印刷する |
-| 解像度 | 300dpi、1bit 白黒 |
+| 解像度 | 300dpi（ラスタは RGB 8bit で受け取る） |
 | 1 ページ | カード 1 枚（ページごとに `Ss`〜`Se`）。部数 2 でも、内容の違う 2 ページの文書でも、2 枚続けて正常に刷れることを実機で確認 |
 | 白紙・用紙違いの確認 | 真っ白なページは刷らない。全部白紙、またはカードの大きさ（85.6×54mm ±2mm）でないページはジョブを止め、キューに理由を出す |
 | 配置 | 1011×638 ドットのラスタを、プリンタの 1016×648 の中央に置く。縦長のページは横向きに回す |
