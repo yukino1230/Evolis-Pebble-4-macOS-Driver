@@ -63,7 +63,9 @@ echo "    OK"
 
 echo "==> プリンタキューを登録: $QUEUE"
 lpadmin -p "$QUEUE" -E -v "$URI" -P "$PPD" \
-        -D "Evolis Pebble 4" -L "USB" -o printer-is-shared=false -o EvolisRibbon="$RIBBON"
+        -D "Evolis Pebble 4" -L "USB" -o printer-is-shared=false -o EvolisRibbon="$RIBBON" \
+        -o printer-error-policy=abort-job
+# フィルタが用紙サイズの違うジョブを止めたとき、プリンタごと一時停止させずにそのジョブだけ取り消す
 echo "    既定のリボン: $RIBBON"
 
 echo

@@ -299,6 +299,18 @@ int main(int argc, char **argv) {
         if (!w || !h || !stride) { logmsg("ERROR", "ラスタヘッダが不正です"); return 1; }
         if (hdpi != 300 || vdpi != 300)
             logmsg("WARNING", "解像度が 300dpi ではありません (%ux%u)", hdpi, vdpi);
+        /* カードの大きさでないページは刷らずに止める。印刷ダイアログの用紙サイズは macOS の
+           既定(A4 など)で開くので、CR80 を選び忘れると A4 のラスタが届き、そのまま刷ると
+           切り抜かれた無意味なカードが1枚出てしまう */
+        {
+            double wmm = hdpi ? w * 25.4 / hdpi : 0, hmm = vdpi ? h * 25.4 / vdpi : 0;
+            double lo = wmm < hmm ? wmm : hmm, hi = wmm < hmm ? hmm : wmm;
+            if (lo < 54.0 - 2 || lo > 54.0 + 2 || hi < 85.6 - 2 || hi > 85.6 + 2) {
+                logmsg("ERROR", "用紙サイズがカードではありません (%.0f x %.0f mm)。"
+                       "印刷ダイアログで用紙サイズを「カード CR80」にしてください", wmm, hmm);
+                return 1;
+            }
+        }
         ras = calloc((size_t)stride * h, 1);
         if (!ras) { logmsg("ERROR", "メモリ不足"); return 1; }
         if (compressed) unrle(ras, stride, h, bpp);
