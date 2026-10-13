@@ -250,7 +250,7 @@ static void set_option(const char *key, const char *val) {
 
 int main(int argc, char **argv) {
     unsigned char magic[4];
-    int pages = 0;
+    int pages = 0, npages = 0;    /* 刷ったカードの数 / 受け取ったページの数 */
 
     if (argc < 6) { logmsg("ERROR", "引数が足りません"); return 1; }
     /* ジョブに指定がなければ、キューの PPD の既定値を使う。CUPS はダイアログで既定のまま
@@ -318,6 +318,20 @@ int main(int argc, char **argv) {
 
         place(ras, w, h, stride, bpp, cspace);
         free(ras);
+        npages++;
+
+        /* 真っ白なページは刷らない。印刷ダイアログで用紙サイズを CR80 にし忘れると、アプリは
+           A4 のページを作り、macOS は用紙だけ CR80 に置き換えて送ってくる。ラスタには A4 の
+           左下のカード1枚分が切り出されて真っ白になり、白紙のカードが1枚出てしまう */
+        {
+            const unsigned char *c = &canvas[0][0][0];
+            size_t n = sizeof canvas, i = 0;
+            while (i < n && c[i] == 255) i++;
+            if (i == n) {
+                logmsg("WARNING", "ページ%d は真っ白なので刷りません", npages);
+                continue;
+            }
+        }
 
         if (pages == 0) {
             char cmd[16];
@@ -337,7 +351,14 @@ int main(int argc, char **argv) {
                pages + 1, w, h, bpp, ribbon->name, contrast_k, contrast_color);
         pages++;
     }
-    if (!pages) { logmsg("ERROR", "ページがありません"); return 1; }
+    if (!pages) {
+        if (npages)
+            logmsg("ERROR", "印刷する内容がありません。"
+                   "印刷ダイアログで用紙サイズを「カード CR80」にしてください");
+        else
+            logmsg("ERROR", "ページがありません");
+        return 1;
+    }
     for (int i = 0; i < 64; i++) fputc(0, stdout);   /* 参考実装に合わせた末尾の詰め物 */
     fflush(stdout);
     return 0;
