@@ -209,10 +209,24 @@ static void print_card(int ribbon) {
     esc("Se");
 }
 
+static const char *ribbon_name[] = { "k", "ymcko", "ymckos" };
+static int ribbon = RIB_K;
+static int contrast_k = 10, contrast_color = 10;   /* Pc の値 0..20、工場出荷時 10 */
+
+static void set_option(const char *key, const char *val) {
+    if (!strcmp(key, "EvolisRibbon")) {
+        for (int i = 0; i < 3; i++)
+            if (!strcmp(val, ribbon_name[i])) ribbon = i;
+    } else if (!strcmp(key, "EvolisContrastK") || !strcmp(key, "EvolisContrastColor")) {
+        int v = atoi(val);
+        if (v < 0 || v > 20) return;
+        if (!strcmp(key, "EvolisContrastK")) contrast_k = v; else contrast_color = v;
+    }
+}
+
 int main(int argc, char **argv) {
-    static const char *ribbon_name[] = { "k", "ymcko", "ymckos" };
     unsigned char magic[4];
-    int pages = 0, ribbon = RIB_K;
+    int pages = 0;
 
     if (argc < 6) { logmsg("ERROR", "引数が足りません"); return 1; }
     /* ジョブに指定がなければ、キューの PPD の既定値を使う。CUPS はダイアログで既定のまま
@@ -220,11 +234,10 @@ int main(int argc, char **argv) {
        カラーリボンでも黒の1パスだけ刷って排出してしまう */
     if (getenv("PPD")) {
         FILE *ppd = fopen(getenv("PPD"), "r");
-        char line[256], val[32];
+        char line[256], key[64], val[32];
         while (ppd && fgets(line, sizeof line, ppd))
-            if (sscanf(line, "*DefaultEvolisRibbon: %31s", val) == 1)
-                for (int i = 0; i < 3; i++)
-                    if (!strcmp(val, ribbon_name[i])) ribbon = i;
+            if (sscanf(line, "*Default%63[A-Za-z]: %31s", key, val) == 2)
+                set_option(key, val);
         if (ppd) fclose(ppd);
     }
     /* argv[5] は "key=value key=value ..." */
@@ -232,9 +245,7 @@ int main(int argc, char **argv) {
         char *o = strdup(argv[5]), *tok, *sp = NULL;
         for (tok = strtok_r(o, " \t", &sp); tok; tok = strtok_r(NULL, " \t", &sp)) {
             char *eq = strchr(tok, '='); if (!eq) continue; *eq = 0;
-            if (!strcmp(tok, "EvolisRibbon"))
-                for (int i = 0; i < 3; i++)
-                    if (!strcmp(eq + 1, ribbon_name[i])) ribbon = i;
+            set_option(tok, eq + 1);
         }
     }
     in = (argc > 6) ? fopen(argv[6], "rb") : stdin;
@@ -276,9 +287,18 @@ int main(int argc, char **argv) {
             char cmd[16];
             snprintf(cmd, sizeof cmd, "Pr;%s", ribbon_name[ribbon]);
             esc(cmd);
+            /* コントラストは本体に残るので、標準(10)でも毎回送る */
+            snprintf(cmd, sizeof cmd, "Pc;k;=;%d", contrast_k);
+            esc(cmd);
+            if (ribbon != RIB_K)
+                for (const char *p = "ymc"; *p; p++) {
+                    snprintf(cmd, sizeof cmd, "Pc;%c;=;%d", *p, contrast_color);
+                    esc(cmd);
+                }
         }
         print_card(ribbon);
-        logmsg("INFO", "カード%d: %ux%u ドット %ubit リボン %s", pages + 1, w, h, bpp, ribbon_name[ribbon]);
+        logmsg("INFO", "カード%d: %ux%u ドット %ubit リボン %s コントラスト 黒%d カラー%d",
+               pages + 1, w, h, bpp, ribbon_name[ribbon], contrast_k, contrast_color);
         pages++;
     }
     if (!pages) { logmsg("ERROR", "ページがありません"); return 1; }

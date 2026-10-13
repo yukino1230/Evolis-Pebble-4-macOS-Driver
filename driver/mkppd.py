@@ -53,6 +53,17 @@ def main():
     w('*EvolisRibbon ymckos/YMCKO カラー (ハーフパネル R3013 など): ""')
     w('*CloseUI: *EvolisRibbon')
     w('')
+    # コントラスト (Pc)。本体は 0..20、工場出荷時 10。黒の網点の補正は 10 で測ったもの
+    for key, label, order in (("EvolisContrastK", "黒の濃さ", 20),
+                              ("EvolisContrastColor", "カラーの濃さ (カラーリボン)", 30)):
+        w(f'*OpenUI *{key}/{label}: PickOne')
+        w(f'*OrderDependency: {order} AnySetup *{key}')
+        w(f'*Default{key}: 10')
+        for v in range(0, 21, 2):
+            note = " (標準)" if v == 10 else " (薄い)" if v == 0 else " (濃い)" if v == 20 else ""
+            w(f'*{key} {v}/{v}{note}: ""')
+        w(f'*CloseUI: *{key}')
+    w('')
     w('*OpenUI *Resolution/解像度: PickOne')
     w('*DefaultResolution: 300dpi')
     w('*Resolution 300dpi/300 dpi: "<</HWResolution[300 300]>>setpagedevice"')
