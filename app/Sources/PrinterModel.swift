@@ -13,6 +13,7 @@ final class PrinterModel: ObservableObject {
     @Published var settings: [StatusRow] = []
     @Published var cleaning: [StatusRow] = []
     @Published var needsCleaning = false
+    @Published var headKit = ""
     @Published var message: String?
     @Published var working = false
 
@@ -25,6 +26,7 @@ final class PrinterModel: ObservableObject {
                 StatusRow(label: L("Cards inserted"), value: String(format: L("%@ cards"), Self.number(try q("Rco;c")))),
                 StatusRow(label: L("Panels printed"), value: Self.number(try q("Rco;p"))),
             ]
+            let kit = try q("Rkn")
             let ribbon = try q("Rr;p")
             // ドライバの「カラーの明るさ」は、本体の Pl(大きいほど濃い)を逆にしたもの
             let pl = Int(try q("Rl;y")).map { String(20 - $0) } ?? "?"
@@ -44,6 +46,7 @@ final class PrinterModel: ObservableObject {
             ]
             return { model in
                 model.printer = printer
+                model.headKit = kit
                 model.settings = settings
                 model.cleaning = cleaning
                 model.needsCleaning = due != "OK"
@@ -54,6 +57,26 @@ final class PrinterModel: ObservableObject {
     func testCard()      { send("St", label: L("Printing a test card…")) }
     func technicalCard() { send("Stt", label: L("Printing a technical test card…")) }
     func clean()         { send("Scp", label: L("Cleaning…")) }
+
+    /// ヘッドを交換したあと、新しいヘッドのラベルにあるキット番号を本体に書く(Pkn)。
+    /// 本体は番号の頭 3 桁(抵抗値 x 10)を印刷の制御に使う
+    func setHeadKit(_ kit: String) {
+        run(label: L("Setting the print head kit number…")) { p in
+            let reply = try p.query("Pkn;\(kit)")
+            let now = try p.query("Rkn")
+            guard now == kit else {
+                throw EvolisError.io(String(format: L("The printer did not accept the kit number (reply: %@)"), reply))
+            }
+            return { model in model.headKit = now }
+        } then: { [weak self] in
+            self?.refresh()
+        }
+    }
+
+    /// キット番号として送ってよい形か。ユーザーガイドの例は 179-004-00048。本体は「抵抗値-ヘッドの番号-版」の形で返す
+    nonisolated static func isValidKit(_ kit: String) -> Bool {
+        kit.range(of: #"^[0-9]{3}[-0-9A-Z]{3,29}$"#, options: .regularExpression) != nil
+    }
 
     /// 本体の機能を呼び、終わる(また返事が来る)まで待ってから状態を読み直す
     private func send(_ command: String, label: String) {

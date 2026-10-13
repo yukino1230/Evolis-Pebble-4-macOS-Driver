@@ -92,16 +92,29 @@ final class EvolisPrinter {
         catch { throw EvolisError.io(error.localizedDescription) }
     }
 
-    /// コマンドを送って返事を読む。前の返事が残っていることがあるので、先に Rtp で読み捨てる
+    /// コマンドを送って返事を読む。前の返事が残っていることがあるので、先に Rtp で読み捨てる。
+    /// 本体が新しい返事を用意する前に読むと Rtp の返事がもう一度返るので、変わるまで読み直す
     func query(_ command: String, timeout: TimeInterval = 4) throws -> String {
-        if command != "Rtp" { _ = try rawQuery("Rtp", timeout: 2) }
-        return try rawQuery(command, timeout: timeout)
+        guard command != "Rtp" else { return try rawQuery(command, timeout: timeout) }
+        let stale = try rawQuery("Rtp", timeout: 2)
+        try send(command)
+        let deadline = Date().addingTimeInterval(timeout)
+        var reply = try read(until: deadline)
+        while reply == stale, !stale.isEmpty, Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.1)
+            reply = try read(until: deadline)
+        }
+        return reply
     }
 
     private func rawQuery(_ command: String, timeout: TimeInterval) throws -> String {
         try send(command)
+        return try read(until: Date().addingTimeInterval(timeout))
+    }
+
+    /// NUL までの返事を一つ読む
+    private func read(until deadline: Date) throws -> String {
         var buf = Data()
-        let deadline = Date().addingTimeInterval(timeout)
         while !buf.contains(0), Date() < deadline {
             let chunk = NSMutableData(length: 512)!
             var got = 0

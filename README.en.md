@@ -86,10 +86,15 @@ An app to see the printer's status and call its built-in functions. The pkg inst
 Applications folder, Launchpad or Spotlight. The PPD also sets `*APPrinterUtilityPath`, but current macOS (27) has no
 "Open Printer Utility" button in Printers & Scanners ("Options & Supplies" only has General and Supply Levels), so it cannot be opened from there.
 
-- **Printer**: model, firmware, number of cards inserted, number of panels printed
+- **Printer**: model, firmware, number of cards inserted, number of panels printed, print head kit number (`Rkn`)
 - **Settings stored in the printer**: ribbon type, black / color / overlay density, color brightness
 - **Cleaning**: whether cleaning is due (`Rlr;r`), number of cleanings, average and maximum interval
 - **Buttons**: test card, technical test card, cleaning (each asks for confirmation)
+- **Changing the print head kit number**: after replacing the print head, write the kit number from the white label of the new head
+  to the printer (`Pkn;<number>`, step 3 of "Replacing the print head" in the user guide; on Windows it is sent from the official
+  driver's printer dialog). A wrong number makes the printer print incorrectly, so the app asks for it twice, sends it only when both
+  match, and reads it back with `Rkn`. Clean the printer before printing again. The kit number contains the head's serial number,
+  so hide it in screenshots you share
 
 It talks to the printer over USB directly with macOS's IOUSBHost (no libusb or Python needed). While a job is printing, CUPS
 holds the printer and the app shows it as busy. Source in [`app/`](app/), built with `app/build-app.sh`.
