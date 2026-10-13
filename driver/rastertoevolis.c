@@ -213,6 +213,18 @@ int main(int argc, char **argv) {
     int pages = 0, ribbon = RIB_K;
 
     if (argc < 6) { logmsg("ERROR", "引数が足りません"); return 1; }
+    /* ジョブに指定がなければ、キューの PPD の既定値を使う。CUPS はダイアログで既定のまま
+       にしたオプションを argv[5] に入れないので、これを読まないと黒リボン扱いになり、
+       カラーリボンでも黒の1パスだけ刷って排出してしまう */
+    if (getenv("PPD")) {
+        FILE *ppd = fopen(getenv("PPD"), "r");
+        char line[256], val[32];
+        while (ppd && fgets(line, sizeof line, ppd))
+            if (sscanf(line, "*DefaultEvolisRibbon: %31s", val) == 1)
+                for (int i = 0; i < 3; i++)
+                    if (!strcmp(val, ribbon_name[i])) ribbon = i;
+        if (ppd) fclose(ppd);
+    }
     /* argv[5] は "key=value key=value ..." */
     {
         char *o = strdup(argv[5]), *tok, *sp = NULL;
@@ -264,7 +276,7 @@ int main(int argc, char **argv) {
             esc(cmd);
         }
         print_card(ribbon);
-        logmsg("DEBUG", "カード%d: %ux%u ドット %ubit リボン %s", pages + 1, w, h, bpp, ribbon_name[ribbon]);
+        logmsg("INFO", "カード%d: %ux%u ドット %ubit リボン %s", pages + 1, w, h, bpp, ribbon_name[ribbon]);
         pages++;
     }
     if (!pages) { logmsg("ERROR", "ページがありません"); return 1; }
