@@ -20,27 +20,27 @@ final class PrinterModel: ObservableObject {
         run(label: nil) { p in
             func q(_ c: String) throws -> String { try p.query(c) }
             let printer = [
-                StatusRow(label: "機種", value: try q("Rtp")),
-                StatusRow(label: "ファームウェア", value: try q("Rfv")),
-                StatusRow(label: "入れたカードの数", value: Self.number(try q("Rco;c")) + " 枚"),
-                StatusRow(label: "刷ったパネルの数", value: Self.number(try q("Rco;p"))),
+                StatusRow(label: L("Model"), value: try q("Rtp")),
+                StatusRow(label: L("Firmware"), value: try q("Rfv")),
+                StatusRow(label: L("Cards inserted"), value: String(format: L("%@ cards"), Self.number(try q("Rco;c")))),
+                StatusRow(label: L("Panels printed"), value: Self.number(try q("Rco;p"))),
             ]
             let ribbon = try q("Rr;p")
             // ドライバの「カラーの明るさ」は、本体の Pl(大きいほど濃い)を逆にしたもの
             let pl = Int(try q("Rl;y")).map { String(20 - $0) } ?? "?"
             let settings = [
-                StatusRow(label: "リボンの設定", value: Self.ribbonName(ribbon)),
-                StatusRow(label: "黒 / 単色リボンの濃さ", value: try q("Rc;k")),
-                StatusRow(label: "カラーの濃さ", value: try q("Rc;y")),
-                StatusRow(label: "カラーの明るさ", value: pl),
-                StatusRow(label: "オーバーレイの濃さ", value: try q("Rc;o")),
+                StatusRow(label: L("Ribbon setting"), value: Self.ribbonName(ribbon)),
+                StatusRow(label: L("Black / monochrome ribbon density"), value: try q("Rc;k")),
+                StatusRow(label: L("Color density"), value: try q("Rc;y")),
+                StatusRow(label: L("Color brightness"), value: pl),
+                StatusRow(label: L("Overlay density"), value: try q("Rc;o")),
             ]
             let due = try q("Rlr;r")
             let cleaning = [
-                StatusRow(label: "クリーニングの時期", value: due == "OK" ? "まだ要りません" : "クリーニングしてください（\(due)）"),
-                StatusRow(label: "クリーニングの回数", value: Self.number(try q("Rco;n")) + " 回"),
-                StatusRow(label: "クリーニングの平均間隔", value: Self.number(try q("Rco;a")) + " 枚"),
-                StatusRow(label: "クリーニングの最大間隔", value: Self.number(try q("Rco;m")) + " 枚"),
+                StatusRow(label: L("Cleaning due"), value: due == "OK" ? L("Not yet") : String(format: L("Clean the printer (%@)"), due)),
+                StatusRow(label: L("Cleanings"), value: String(format: L("%@ times"), Self.number(try q("Rco;n")))),
+                StatusRow(label: L("Average cleaning interval"), value: String(format: L("%@ cards"), Self.number(try q("Rco;a")))),
+                StatusRow(label: L("Maximum cleaning interval"), value: String(format: L("%@ cards"), Self.number(try q("Rco;m")))),
             ]
             return { model in
                 model.printer = printer
@@ -51,9 +51,9 @@ final class PrinterModel: ObservableObject {
         }
     }
 
-    func testCard()      { send("St", label: "テストカードを刷っています…") }
-    func technicalCard() { send("Stt", label: "技術テストカードを刷っています…") }
-    func clean()         { send("Scp", label: "クリーニングしています…") }
+    func testCard()      { send("St", label: L("Printing a test card…")) }
+    func technicalCard() { send("Stt", label: L("Printing a technical test card…")) }
+    func clean()         { send("Scp", label: L("Cleaning…")) }
 
     /// 本体の機能を呼び、終わる(また返事が来る)まで待ってから状態を読み直す
     private func send(_ command: String, label: String) {
@@ -100,9 +100,11 @@ final class PrinterModel: ObservableObject {
     }
 
     nonisolated static func ribbonName(_ code: String) -> String {
-        let names = ["k Black": "黒", "ymcko": "YMCKO カラー（全面パネル）", "ymckos": "YMCKO カラー（ハーフパネル）",
-                     "ko": "黒 + オーバーレイ", "k White": "白", "k Red": "赤", "k Blue": "青", "k Green": "緑",
-                     "k Gold": "金", "k Silver": "銀", "k Scratch": "スクラッチ", "k Wax Plastic": "黒ワックス"]
-        return names[code].map { "\($0)（\(code)）" } ?? code
+        // 1510 では Pr;k;t のあと "k" とだけ返ることがある
+        let names = ["k Black": L("Black"), "k": L("Black"), "ymcko": L("YMCKO color (full panel)"),
+                     "ymckos": L("YMCKO color (half panel)"), "ko": L("Black + overlay"), "k White": L("White"),
+                     "k Red": L("Red"), "k Blue": L("Blue"), "k Green": L("Green"), "k Gold": L("Gold"),
+                     "k Silver": L("Silver"), "k Scratch": L("Scratch-off"), "k Wax Plastic": L("Black wax")]
+        return names[code].map { "\($0) (\(code))" } ?? code
     }
 }

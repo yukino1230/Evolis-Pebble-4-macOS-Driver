@@ -24,14 +24,14 @@ struct ContentView: View {
     var body: some View {
         VStack(spacing: 0) {
             Form {
-                section("プリンタ", model.printer)
-                section("設定（本体に残っている値）", model.settings)
+                section(L("Printer"), model.printer)
+                section(L("Settings stored in the printer"), model.settings)
                 Section {
                     rows(model.cleaning)
                 } header: {
-                    Text("クリーニング")
+                    Text("Cleaning")
                 } footer: {
-                    Text("クリーニングにはクリーニングカードが要ります。リボンを外してから実行してください。")
+                    Text("Cleaning needs a cleaning card. Remove the ribbon before running it.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
@@ -47,11 +47,11 @@ struct ContentView: View {
             }
 
             HStack {
-                Button("テストカード…") { confirm = .test }
-                Button("技術テストカード…") { confirm = .technical }
-                Button("クリーニング…") { confirm = .clean }
+                Button("Test card…") { confirm = .test }
+                Button("Technical test card…") { confirm = .technical }
+                Button("Clean…") { confirm = .clean }
                 Spacer()
-                Button("更新") { model.refresh() }
+                Button("Refresh") { model.refresh() }
                     .keyboardShortcut("r")
             }
             .disabled(model.working)
@@ -67,7 +67,7 @@ struct ContentView: View {
                 case .clean:     model.clean()
                 }
             }
-            Button("キャンセル", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         } message: { action in
             Text(detail(action))
         }
@@ -88,21 +88,21 @@ struct ContentView: View {
 
     private func title(_ a: Action?) -> String {
         switch a {
-        case .test: return "テストカードを刷りますか？"
-        case .technical: return "技術テストカードを刷りますか？"
-        case .clean: return "クリーニングしますか？"
+        case .test: return L("Print a test card?")
+        case .technical: return L("Print a technical test card?")
+        case .clean: return L("Clean the printer?")
         case nil: return ""
         }
     }
     private func button(_ a: Action) -> String {
-        switch a { case .test, .technical: return "刷る"; case .clean: return "クリーニングする" }
+        switch a { case .test, .technical: return L("Print"); case .clean: return L("Clean") }
     }
     private func detail(_ a: Action) -> String {
         switch a {
         case .test, .technical:
-            return "カードを 1 枚使います。カードにはシリアル番号などが刷られます。"
+            return L("This uses one card. The card shows the serial number and other details.")
         case .clean:
-            return "リボンを外し、クリーニングカードをフィーダーに入れてから実行してください。"
+            return L("Remove the ribbon and put a cleaning card in the feeder before running it.")
         }
     }
 }

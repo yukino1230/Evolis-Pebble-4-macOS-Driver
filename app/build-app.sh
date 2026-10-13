@@ -31,13 +31,17 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VER</string>
   <key>CFBundleVersion</key><string>$VER</string>
-  <key>CFBundleDevelopmentRegion</key><string>ja</string>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleLocalizations</key><array><string>en</string><string>ja</string></array>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
   <key>NSHighResolutionCapable</key><true/>
 </dict>
 </plist>
 PLIST
+
+# 画面の訳(英語がキーで、ja.lproj に日本語)
+cp -R "$HERE"/Resources/*.lproj "$APP/Contents/Resources/"
 
 xattr -cr "$APP" 2>/dev/null || true
 if [ -n "$SIGN_APP" ]; then

@@ -20,8 +20,8 @@ not been tested on a printer. The Pebble 4 prints on one side only.
 *Scan of the sample card ([samples/sample-card.pdf](samples/sample-card.pdf)) printed from the v1.1 print dialog with a
 half-panel YMCKO ribbon (R3013). The left part (about 36 mm) is in color; the right part is printed as a halftone on the black panel.*
 
-> **Note on language:** the print-dialog options, the Evolis Utility app and the messages of the command-line tools
-> are currently in **Japanese**. The tables below give the English meaning of each option.
+> **Languages:** the print-dialog options, the Evolis Utility app, the command-line tools and the queue messages are in
+> **English and Japanese** and follow the macOS language setting (from v1.2; v1.1 and earlier are Japanese only).
 
 ## Installation
 
@@ -67,18 +67,18 @@ sudo pkgutil --forget jp.yukino.evolis-pebble4
 
 ### Print dialog options
 
-The options appear under "Printer Options" in the print dialog (labels are in Japanese for now).
+The options appear under "Printer Options" in the print dialog.
 
-| Label | Meaning | Values |
-|---|---|---|
-| 用紙サイズ / カード CR80 | Paper size | CR80 card, 85.6 × 54 mm, borderless |
-| リボン | Ribbon | Must match the loaded ribbon ([Ribbon types](#ribbon-types-pr)) |
-| オーバーレイ (保護層) | Overlay (protective layer) | 全面 full / なし none / IC チップを避ける avoid IC chip (ISO 7816) / 磁気ストライプを避ける avoid magnetic stripe (ISO 7811, for the back side) |
-| 黒パネルの処理 | Black panel rendering | グレー gray (halftone, default) / 線画 line art (black or white) |
-| 黒 / 単色リボンの濃さ | Black / single-color ribbon density | 0–20 (standard 10) |
-| カラーの濃さ | Color density | 0–20 (standard 10) |
-| カラーの明るさ | Color brightness (higher = lighter) | 0–20 (standard 10) |
-| オーバーレイの濃さ | Overlay density | 0–20 (standard 10) |
+| Option | Values |
+|---|---|
+| Media Size | CR80 card (85.6 × 54 mm), borderless |
+| Ribbon | Must match the loaded ribbon ([Ribbon types](#ribbon-types-pr)) |
+| Overlay (protective layer) | Full card / None / Avoid IC chip (ISO 7816) / Avoid magnetic stripe (ISO 7811, back side) |
+| Black panel rendering | Gray (halftone, default) / Line art (black or white) |
+| Black / monochrome ribbon density | 0–20 (standard 10) |
+| Color density (color ribbons) | 0–20 (standard 10) |
+| Color brightness (color ribbons, higher = lighter) | 0–20 (standard 10) |
+| Overlay density | 0–20 (standard 10) |
 
 ### Evolis Utility
 
@@ -350,9 +350,9 @@ half-panel R3013 and `ymcko`, the overlay ribbon stuck to the card and broke whe
 
 ### Paper size in the print dialog
 
-**When printing a PDF from Preview, the print dialog opens with the paper size "Other (210 x 297 mm)". Choose "カード CR80" (CR80 card) every time.**
+**When printing a PDF from Preview, the print dialog opens with the paper size "Other (210 x 297 mm)". Choose "CR80 card" every time.**
 
-**In Pages and Word, choose printer "Evolis Pebble 4" and paper "カード CR80" in the document's Page Setup**
+**In Pages and Word, choose printer "Evolis Pebble 4" and paper "CR80 card" in the document's Page Setup**
 (neither print dialog has a paper size field; the document's page setup is used. Confirmed for both).
 
 - The initial paper size comes from the app's page setup (in Preview, the system-wide default paper, A4). The printer has no
@@ -371,8 +371,7 @@ card artwork in the middle) and macOS replaces only the media with CR80 (the job
 bottom-left card-sized part of the A4 page, which is blank.
 
 So the driver **does not print blank pages**. If the whole job is blank, it stops without sending a card and shows
-"印刷する内容がありません。印刷ダイアログで用紙サイズを「カード CR80」にしてください" ("Nothing to print. Set the paper size to
-CR80 card in the print dialog") in the queue. Jobs stopped by the driver (filter) are just marked "Stopped" by CUPS; the
+"Nothing to print. Set the paper size to "CR80 card" in the print dialog" in the queue. Jobs stopped by the driver (filter) are just marked "Stopped" by CUPS; the
 printer itself keeps going (the next job prints normally). The queue's `printer-error-policy` applies only to USB backend
 failures, not to filter failures (`finalize_job` in [CUPS `scheduler/job.c`](https://github.com/apple/cups/blob/master/scheduler/job.c)).
 The stopped job stays in the queue with the message; delete it with "×" (Resume stops it again for the same reason).

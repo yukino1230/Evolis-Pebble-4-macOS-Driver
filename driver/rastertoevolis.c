@@ -26,6 +26,10 @@
 static FILE *in;
 static int   little, compressed;
 
+/* メッセージの言語。CUPS はジョブの言語を LANG(ja_JP.UTF-8 など)でフィルタに渡す */
+static int lang_ja;
+#define T(en, ja) (lang_ja ? (ja) : (en))
+
 static void logmsg(const char *lv, const char *fmt, ...) {
     va_list ap; va_start(ap, fmt);
     fprintf(stderr, "%s: [rastertoevolis] ", lv);
@@ -290,7 +294,8 @@ int main(int argc, char **argv) {
     unsigned char magic[4];
     int pages = 0, npages = 0;    /* 刷ったカードの数 / 受け取ったページの数 */
 
-    if (argc < 6) { logmsg("ERROR", "引数が足りません"); return 1; }
+    lang_ja = getenv("LANG") && !strncmp(getenv("LANG"), "ja", 2);
+    if (argc < 6) { logmsg("ERROR", T("Not enough arguments", "引数が足りません")); return 1; }
     /* ジョブに指定がなければ、キューの PPD の既定値を使う。CUPS はダイアログで既定のまま
        にしたオプションを argv[5] に入れないので、これを読まないと黒リボン扱いになり、
        カラーリボンでも黒の1パスだけ刷って排出してしまう */
@@ -311,13 +316,13 @@ int main(int argc, char **argv) {
         }
     }
     in = (argc > 6) ? fopen(argv[6], "rb") : stdin;
-    if (!in) { logmsg("ERROR", "入力を開けません"); return 1; }
-    if (readn(magic, 4) != 4) { logmsg("ERROR", "入力が空です"); return 1; }
+    if (!in) { logmsg("ERROR", T("Cannot open the input", "入力を開けません")); return 1; }
+    if (readn(magic, 4) != 4) { logmsg("ERROR", T("The input is empty", "入力が空です")); return 1; }
     if      (!memcmp(magic, "RaS2", 4)) { little = 0; compressed = 1; }
     else if (!memcmp(magic, "2SaR", 4)) { little = 1; compressed = 1; }
     else if (!memcmp(magic, "RaS3", 4)) { little = 0; compressed = 0; }
     else if (!memcmp(magic, "3SaR", 4)) { little = 1; compressed = 0; }
-    else { logmsg("ERROR", "CUPS ラスタではありません"); return 1; }
+    else { logmsg("ERROR", T("Not a CUPS raster", "CUPS ラスタではありません")); return 1; }
 
     for (;;) {
         unsigned char hdr[HDRSIZE];
@@ -332,11 +337,12 @@ int main(int argc, char **argv) {
         stride = rd32(hdr + 392);
         cspace = rd32(hdr + 400);
         if (bpp != 1 && bpp != 8 && bpp != 24) {
-            logmsg("ERROR", "1/8/24bit 以外は非対応です (bpp=%u)", bpp); return 1;
+            logmsg("ERROR", T("Only 1, 8 and 24 bits per pixel are supported (bpp=%u)",
+                                "1/8/24bit 以外は非対応です (bpp=%u)"), bpp); return 1;
         }
-        if (!w || !h || !stride) { logmsg("ERROR", "ラスタヘッダが不正です"); return 1; }
+        if (!w || !h || !stride) { logmsg("ERROR", T("Invalid raster header", "ラスタヘッダが不正です")); return 1; }
         if (hdpi != 300 || vdpi != 300)
-            logmsg("WARNING", "解像度が 300dpi ではありません (%ux%u)", hdpi, vdpi);
+            logmsg("WARNING", T("Resolution is not 300 dpi (%ux%u)", "解像度が 300dpi ではありません (%ux%u)"), hdpi, vdpi);
         /* カードの大きさでないページは刷らずに止める。印刷ダイアログの用紙サイズは macOS の
            既定(A4 など)で開くので、CR80 を選び忘れると A4 のラスタが届き、そのまま刷ると
            切り抜かれた無意味なカードが1枚出てしまう */
@@ -344,13 +350,15 @@ int main(int argc, char **argv) {
             double wmm = hdpi ? w * 25.4 / hdpi : 0, hmm = vdpi ? h * 25.4 / vdpi : 0;
             double lo = wmm < hmm ? wmm : hmm, hi = wmm < hmm ? hmm : wmm;
             if (lo < 54.0 - 2 || lo > 54.0 + 2 || hi < 85.6 - 2 || hi > 85.6 + 2) {
-                logmsg("ERROR", "用紙サイズがカードではありません (%.0f x %.0f mm)。"
-                       "印刷ダイアログで用紙サイズを「カード CR80」にしてください", wmm, hmm);
+                logmsg("ERROR", T("The paper size is not a card (%.0f x %.0f mm). "
+                                  "Set the paper size to \"CR80 card\" in the print dialog",
+                                  "用紙サイズがカードではありません (%.0f x %.0f mm)。"
+                                  "印刷ダイアログで用紙サイズを「カード CR80」にしてください"), wmm, hmm);
                 return 1;
             }
         }
         ras = calloc((size_t)stride * h, 1);
-        if (!ras) { logmsg("ERROR", "メモリ不足"); return 1; }
+        if (!ras) { logmsg("ERROR", T("Out of memory", "メモリ不足")); return 1; }
         if (compressed) unrle(ras, stride, h, bpp);
         else            readn(ras, (size_t)stride * h);
 
@@ -366,7 +374,7 @@ int main(int argc, char **argv) {
             size_t n = sizeof canvas, i = 0;
             while (i < n && c[i] == 255) i++;
             if (i == n) {
-                logmsg("WARNING", "ページ%d は真っ白なので刷りません", npages);
+                logmsg("WARNING", T("Page %d is blank and is not printed", "ページ%d は真っ白なので刷りません"), npages);
                 continue;
             }
         }
@@ -394,18 +402,21 @@ int main(int argc, char **argv) {
             }
         }
         print_card(ribbon);
-        logmsg("INFO", "カード%d: %ux%u ドット %ubit リボン %s コントラスト 黒%d カラー%d 明るさ%d 黒の処理 %s",
+        logmsg("INFO", T("Card %d: %ux%u dots %ubit ribbon %s density black %d color %d brightness %d black panel %s",
+                         "カード%d: %ux%u ドット %ubit リボン %s コントラスト 黒%d カラー%d 明るさ%d 黒の処理 %s"),
                pages + 1, w, h, bpp, ribbon->name, contrast_k, contrast_color, brightness,
-               k_line ? "線画" : "グレー");
-        if (ribbon->overlay) logmsg("INFO", "オーバーレイ %s 濃さ%d", overlay_name[overlay_mode], contrast_o);
+               k_line ? T("line art", "線画") : T("gray", "グレー"));
+        if (ribbon->overlay)
+            logmsg("INFO", T("Overlay %s density %d", "オーバーレイ %s 濃さ%d"), overlay_name[overlay_mode], contrast_o);
         pages++;
     }
     if (!pages) {
         if (npages)
-            logmsg("ERROR", "印刷する内容がありません。"
-                   "印刷ダイアログで用紙サイズを「カード CR80」にしてください");
+            logmsg("ERROR", T("Nothing to print. Set the paper size to \"CR80 card\" in the print dialog",
+                              "印刷する内容がありません。"
+                              "印刷ダイアログで用紙サイズを「カード CR80」にしてください"));
         else
-            logmsg("ERROR", "ページがありません");
+            logmsg("ERROR", T("No pages", "ページがありません"));
         return 1;
     }
     for (int i = 0; i < 64; i++) fputc(0, stdout);   /* 参考実装に合わせた末尾の詰め物 */

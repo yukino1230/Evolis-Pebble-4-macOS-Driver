@@ -4,6 +4,9 @@ import Foundation
 import IOKit
 import IOUSBHost
 
+/// 画面の文字列。英語がキーで、日本語の訳は ja.lproj/Localizable.strings にある
+func L(_ key: String) -> String { NSLocalizedString(key, comment: "") }
+
 enum EvolisError: LocalizedError {
     case notFound
     case busy
@@ -11,9 +14,9 @@ enum EvolisError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .notFound: return "プリンタが見つかりません。USB の接続と電源を確かめてください。"
-        case .busy:     return "プリンタは使用中です（印刷中など）。終わってから更新してください。"
-        case .io(let s): return "通信できませんでした: \(s)"
+        case .notFound: return L("Printer not found. Check the USB cable and the power.")
+        case .busy:     return L("The printer is busy (printing, etc.). Refresh when it is done.")
+        case .io(let s): return String(format: L("Communication failed: %@"), s)
         }
     }
 }
@@ -52,7 +55,7 @@ final class EvolisPrinter {
             }
             ep = IOUSBGetNextEndpointDescriptor(config, iface, UnsafeRawPointer(e).assumingMemoryBound(to: IOUSBDescriptorHeader.self))
         }
-        guard outAddr != 0, inAddr != 0 else { interface.destroy(); throw EvolisError.io("エンドポイントがありません") }
+        guard outAddr != 0, inAddr != 0 else { interface.destroy(); throw EvolisError.io("no bulk endpoints") }
         do {
             outPipe = try interface.copyPipe(withAddress: Int(outAddr))
             inPipe = try interface.copyPipe(withAddress: Int(inAddr))

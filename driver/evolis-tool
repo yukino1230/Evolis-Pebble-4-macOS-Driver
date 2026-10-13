@@ -7,14 +7,26 @@
 set -eu
 QUEUE=""
 ACTION=""
+# メッセージの言語: LANG が ja なら日本語、それ以外は英語。LANG が無いとき(sudo で消えたときなど)は
+# macOS の言語設定(AppleLanguages の先頭)を見る
+lang="${LANG:-}"
+if [ -z "$lang" ]; then
+  u="${SUDO_USER:-$(id -un)}"
+  lang="$( (if [ "$(id -u)" = 0 ] && [ "$u" != root ]; then sudo -u "$u" defaults read -g AppleLanguages; \
+           else defaults read -g AppleLanguages; fi) 2>/dev/null | sed -n '2s/[^a-z]*\([a-z][a-z]\).*/\1/p')"
+fi
+case "$lang" in ja*) JA=1 ;; *) JA=0 ;; esac
+say() { if [ "$JA" = 1 ]; then echo "$2"; else echo "$1"; fi; }
 while [ $# -gt 0 ]; do
   case "$1" in
     --queue) QUEUE="$2"; shift 2 ;;
     test|techtest|clean) ACTION="$1"; shift ;;
-    *) echo "使い方: evolis-tool [--queue <名前>] test | techtest | clean"; exit 1 ;;
+    *) say "Usage: evolis-tool [--queue <name>] test | techtest | clean" \
+           "使い方: evolis-tool [--queue <名前>] test | techtest | clean"; exit 1 ;;
   esac
 done
-[ -n "$ACTION" ] || { echo "使い方: evolis-tool [--queue <名前>] test | techtest | clean"; exit 1; }
+[ -n "$ACTION" ] || { say "Usage: evolis-tool [--queue <name>] test | techtest | clean" \
+                          "使い方: evolis-tool [--queue <名前>] test | techtest | clean"; exit 1; }
 
 if [ -z "$QUEUE" ]; then
   # lpstat の文はシステムの言語で変わるので、キューごとに接続先を見る
@@ -22,15 +34,16 @@ if [ -z "$QUEUE" ]; then
     if lpstat -v "$q" 2>/dev/null | grep -q "usb://EVOLIS/"; then QUEUE="$q"; break; fi
   done
 fi
-[ -n "$QUEUE" ] || { echo "Evolis のキューが見つかりません。--queue で指定してください"; exit 1; }
+[ -n "$QUEUE" ] || { say "No Evolis queue found. Specify it with --queue" "Evolis のキューが見つかりません。--queue で指定してください"; exit 1; }
 
 case "$ACTION" in
-  test)     CMD='St';  WHAT="テストカード" ;;
-  techtest) CMD='Stt'; WHAT="技術テストカード" ;;
-  clean)    CMD='Scp'; WHAT="クリーニング"
-            echo "クリーニングをします。リボンを外し、クリーニングカードをフィーダーに入れてください。"
-            read -r -p "準備ができたら yes と入力: " ok
-            [ "$ok" = "yes" ] || { echo "やめました"; exit 0; } ;;
+  test)     CMD='St';  WHAT="$(say "Test card" "テストカード")" ;;
+  techtest) CMD='Stt'; WHAT="$(say "Technical test card" "技術テストカード")" ;;
+  clean)    CMD='Scp'; WHAT="$(say "Cleaning" "クリーニング")"
+            say "Cleaning the printer. Remove the ribbon and put a cleaning card in the feeder." \
+                "クリーニングをします。リボンを外し、クリーニングカードをフィーダーに入れてください。"
+            read -r -p "$(say "Type yes when ready: " "準備ができたら yes と入力: ")" ok
+            [ "$ok" = "yes" ] || { say "Cancelled" "やめました"; exit 0; } ;;
 esac
 printf '\033%s\r' "$CMD" | lp -d "$QUEUE" -o raw -t "evolis-tool $ACTION" >/dev/null
-echo "$WHAT を $QUEUE に送りました。"
+say "$WHAT sent to $QUEUE." "$WHAT を $QUEUE に送りました。"
