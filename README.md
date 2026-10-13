@@ -15,7 +15,7 @@ Evolis は現行の macOS ドライバを Pebble 世代には出していませ�
 
 | | |
 |---|---|
-| コマンドリファレンス | **公式の Evolis Card Printers Programming Guide A5013** が New Pebble / Tattoo / Dualys / Quantum / Kiosk をカバー。[Rev.D2 は表紙が "NEW PEBBLE PROGRAMMING GUIDE"](https://www.yumpu.com/en/document/view/54519120/new-pebble-programming-guide-a5013-revd2/9)。コマンドの詳細は [Qu2 版の写し](https://idoc.pub/documents/programming-guide-evolis-qu2-en5k9g7wqpno)で確認した |
+| コマンドリファレンス | **公式の Evolis Card Printers Programming Guide A5013** が New Pebble / Tattoo / Dualys / Quantum / Kiosk をカバー。[Rev.D2 は表紙が "NEW PEBBLE PROGRAMMING GUIDE"](https://www.yumpu.com/en/document/view/54519120/new-pebble-programming-guide-a5013-revd2/9)。コマンドの詳細は [Qu2 版の写し](https://idoc.pub/documents/programming-guide-evolis-qu2-en5k9g7wqpno)と、手元の Rev.E（公開していない）で確認した |
 | 公式 Linux ドライバ | 2014年12月に **Pebble 2 / 3 / 4** を含む世代向けの RPM / DEB が出ている（現在はレガシー扱い） |
 | 公式 macOS ドライバ | [現行の互換性表](https://www.evolis.com/wp-content/uploads/2022/05/Drivers-Compatibility-Chart-ENG.pdf)に **Pebble の行は無い** |
 | オープンソースの実装例 | [dpavlin/Printer-EVOLIS](https://github.com/dpavlin/Printer-EVOLIS)（Dualys 3 向け、Perl、GPLv2+）。実際に送るバイト列が読める |
@@ -44,7 +44,7 @@ ESC Se        CR   シーケンス終了
 | `ESC Rtp CR` | プリンタの機種名 |
 | `ESC Rfv CR` | ファームウェアのバージョン |
 | `ESC Rsn CR` | シリアル番号 |
-| `ESC Rco;l CR` | リボンのカウンタ |
+| `ESC Rco;p CR` | 刷ったパネルの数（カウンタ） |
 
 ## 実機で確かめたこと（2026-10-13）
 
@@ -61,14 +61,14 @@ ESC Se        CR   シーケンス終了
 | `Rtp` | `Pebble 4` — A5013 のコマンド体系がそのまま通る |
 | `Rfv` | `1012` |
 | `Rsn` | `PB0839xxxxxxx` |
-| `Rco;l` | `2`（リボン残量？ 単位は要確認） |
-| `Rkn` | `411-D85xxxxx-D`（リボンの識別子？） |
+| `Rco;l` | `2`（`l` は A5013 に載っていないオプション。意味は不明） |
+| `Rkn` | `411-D85xxxxx-D`（印字ヘッドのキット番号。先頭 3 桁がヘッドの抵抗値 ×10） |
 | `Rse` | `ERROR CDE` — 未知コマンドはこの形で返る |
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install pyusb
-.venv/bin/python tools/evolis_query.py            # Rtp Rfv Rsn Rco;l
-.venv/bin/python tools/evolis_query.py "Rco;l" Rkn
+.venv/bin/python tools/evolis_query.py            # Rtp Rfv Rsn Rco;p
+.venv/bin/python tools/evolis_query.py "Rr;p" "Rc;k"
 ```
 
 ### 片面・黒の印刷（2026-10-13 成功）
@@ -116,7 +116,11 @@ ESC Se CR
 - **`Pr` で設定したリボンの種類は本体に保存される。** `Rr;p` で読める
 - **リボンの種類を間違えると、カードが詰まったりリボンが切れたりする。** ハーフパネルの R3013 に `ymcko` を送ったら、
   印刷途中で止まった。オーバーレイ（保護層）のリボンがカードに付いてきて、剥がそうとするとリボンが切れた
-- **ハーフパネル（R3013）で色が乗るのはカードの左側だけ。** 左端から約 43%（約 435 ドット）。黒とオーバーレイは全面
+- **ハーフパネル（R3013）で色が乗るのはカードの左側だけ。** 左端から約 43%（約 435 ドット）。黒とオーバーレイは全面。
+  A5013 にはハーフパネル用の部分ダウンロード `Dbp`（最大 420 行）と開始位置の `Psp` / `Rsp` があるが、ドライバは全面の `Db` を
+  送り、色を乗せる幅を 430 ドットにしている（サンプルカードで 430 まで色が欠けずに出ることを確かめた）
+- A5013 の `Db` の説明にはデータの大きさが 84,624 / 423,120 バイトと載っているが、同じページの式
+  （648 × 1016 × ビット数 ÷ 8）で出る 82,296 / 411,480 バイトで刷れている
 - ほぼ黒の無彩色（RGB の各値が 24 未満、差も 24 未満）だけを黒パネルに回し、それ以外は Y/M/C で刷る
 - **黒パネルの網点は、点を散らす誤差拡散だと 60% 前後で真っ黒に潰れる**（樹脂の黒が 1 ドットごとににじむ）。
   点を中心から太らせる 6×6 の網点（50 線）にして、[目盛りカード](tools/make_halftone_cal.py)で測った補正をかけている。
@@ -185,10 +189,10 @@ cd tools
 |---|---|---|
 | `Rr` | `ymckos` | 本体のメモリに設定された種類 |
 | `Rcr` | `OK` | リボン末尾の黒マークの上にいない（カラーリボンのとき） |
-| `Rrs` | `S D` | リボン幅の扱い（巻き取りの電圧用） |
+| `Rrs` | `S D` | リボンの大きさの扱い（`S` = 200 枚用、`L` = 1000 枚用。巻き取りの電圧用） |
 | `Rro` | `552 588 38` | リボン位置のオフセット |
 | `Rsp` | `0 0` | ハーフパネル用の印刷開始位置 |
-| `Rco;l` | `2` | あと何枚刷れるかの目安（「正確ではない」とある） |
+| `Rco;l` | `2` | `l` は A5013 に載っていない（残り枚数の目安は `Rco;I` だが、この機種では `ERROR PARAMETRES`） |
 | `Rrm` | 応答なし | |
 
 **リボンを付け替えたら、利用者がドライバのリボンを合わせる。** 合っていないと、カードが詰まったりリボンが切れたりする
@@ -234,8 +238,8 @@ cd tools
 
 | コマンド | 意味 |
 |---|---|
-| `Pc;<p>;=;<n>` | パネル p（y / m / c / k / o / a = 全部）のコントラストを n にする。**0〜20**、工場出荷時 10。範囲外は `ERROR PARAMETRES` |
-| `Rc;<p>` | 今の値を読む。`Rc;a` は 7 つの値が返る。**4 つ目はカラーリボンの黒パネルの値で、単色リボンの濃さは `Rc;k` でしか読めない**（単色リボン装着時に `Rc;a` の 4 つ目が 14 のまま、`Rc;k` は 10 だった） |
+| `Pc;<p>;=;<n>` | パネル p（y / m / c / k / o / a = 全部）のコントラストを n にする。**0〜20**、工場出荷時 10。範囲外は `ERROR PARAMETRES`。A5013 の一覧では単色リボンは `kb`（黒）`kw`（白）などだが、`k` も受け付け、`Rc;k` に反映された |
+| `Rc;<p>` | 今の値を読む。`Rc;a` は 7 つの値が返るが、並び順は A5013 に無い。**単色リボンの濃さは `Rc;k`（今選ばれている単色リボン）で読む**（単色リボン装着時に `Rc;a` の 4 つ目が 14 のまま、`Rc;k` は 10 だった。4 つ目はカラーリボンの黒パネルの値と推測） |
 | `Pl` / `Rl` | 明るさ（y / m / c）。工場出荷時 10 |
 
 設定は本体に残る可能性があるので、ドライバは標準の 10 でも毎ジョブ送っている。

@@ -2,7 +2,7 @@
 """Send read-only status queries (ESC R... CR) to an Evolis Pebble over USB.
 
 These commands never feed a card or advance the ribbon.
-Usage: evolis_query.py [CMD ...]   e.g. evolis_query.py Rtp Rfv "Rco;l"
+Usage: evolis_query.py [CMD ...]   e.g. evolis_query.py Rtp Rfv "Rc;k"
 """
 import sys
 import time
@@ -12,7 +12,7 @@ import usb.core
 import usb.util
 
 VID = 0x0F49
-DEFAULT_CMDS = ["Rtp", "Rfv", "Rsn", "Rco;l"]
+DEFAULT_CMDS = ["Rtp", "Rfv", "Rsn", "Rco;p"]
 
 
 def open_printer():
