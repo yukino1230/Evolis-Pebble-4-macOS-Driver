@@ -18,5 +18,7 @@ mono          exit=0 d7059a016536d821
 rle           exit=0 cbf6476c7dc6567e
 blank-page    exit=0 cbf6476c7dc6567e
 a4            exit=1 e3b0c44298fc1c14
+urf           exit=0 cbf6476c7dc6567e
+urf-gray      exit=0 d3487e27aedcac62
 ppd-default   exit=0 cbf6476c7dc6567e
 ppd-override  exit=0 d3487e27aedcac62

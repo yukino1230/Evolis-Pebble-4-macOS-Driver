@@ -96,8 +96,9 @@ sudo driver/install.sh --ribbon k      # pkg を作らずに、その場でビ�
 `build-pkg.sh` は Developer ID 証明書があれば自動で署名する（無ければ未署名のまま作る）。
 `EVOLIS_NOTARY=<notarytool のプロファイル名>` を付けると公証まで行う。
 
-フィルタを変えたら `tests/run.sh` で、刷られる内容が変わっていないかを確かめる（テスト用のラスタ 7 種類とオプションの組み合わせ 22 通りで、
+フィルタを変えたら `tests/run.sh` で、刷られる内容が変わっていないかを確かめる（テスト用のラスタ 9 種類とオプションの組み合わせ 24 通りで、
 プリンタに送るバイト列を前と比べる）。刷り方を意図して変えたときは `tests/run.sh --update` で記録し直す。
+`tests/ipp.sh` は、Printer Application の試作（下の「PPD が使えなくなったとき」）を通しても同じ出力になるかを確かめる。
 
 ## 分かっていること（2026-10-13 時点の調査）
 
@@ -535,14 +536,38 @@ CUPS の PPD を使うドライバは、将来の CUPS で廃止される予定�
 - **[`driver/rastertoevolis.c`](driver/rastertoevolis.c)**（CUPS の入口）: CUPS ラスタを読み、PPD と印刷ダイアログのオプションを
   コアに渡し、エラーをキューに出すだけ
 
-IPP Everywhere のプリンタに届くのは PWG ラスタ（`image/pwg-raster`）で、CUPS ラスタ v2 と同じ形式なので、今の読み取りがそのまま使える。
-移るときは、Printer Application（たとえば macOS でも動く [PAPPL](https://www.msweet.org/pappl/)）を作り、
+IPP Everywhere / AirPrint のプリンタに届くのは PWG ラスタ（`image/pwg-raster`、CUPS ラスタ v2 と同じ形式）か
+Apple ラスタ（`image/urf`）で、`rastertoevolis` はどちらも読める。
 
-- 受け取る形式: PWG ラスタ、300dpi、RGB 8bit。用紙は CR80 だけ
-- 受け取ったページを `evolis_place` → `evolis_print_card` に通し、USB でプリンタに送る
-- リボンや濃さは、印刷ダイアログに出せないかもしれないので、Printer Application の設定（または Evolis Utility）で選ぶ
+#### Printer Application の試作（[`ipp/`](ipp/)）
 
-とすれば、刷る内容は今と同じになる（`tests/run.sh` の記録と比べられる）。
+macOS に入っている `ippeveprinter`（CUPS に付いてくる、IPP Everywhere のプリンタのふりをするサーバ）を使った試作がある。
+PAPPL などを入れなくても動く。
+
+- [`ipp/evolis-pebble4.conf`](ipp/evolis-pebble4.conf): IPP の属性。300dpi、sRGB / グレー 8bit、用紙は CR80（横長、縁なし）だけ
+- [`ipp/evolis-ipp-print`](ipp/evolis-ipp-print): ジョブごとに呼ばれ、受け取ったラスタを `rastertoevolis` で変換し、
+  [`evolis-usb-send`](driver/evolis-usb-send.swift)（Evolis Utility と同じ USB の処理）でプリンタに送る
+- [`ipp/evolis-ipp-server`](ipp/evolis-ipp-server): 上の 2 つを渡して `ippeveprinter` を起動する
+
+```bash
+ipp/evolis-ipp-server --ribbon ymckos                       # 止めるときは Ctrl-C
+ipp/evolis-ipp-server --ribbon k --option EvolisOverlay=none --output /tmp/evolis   # USB に送らずファイルに書く
+```
+
+起動すると DNS-SD で広告するので、「設定」→「プリンタとスキャナ」の追加に「Evolis Pebble 4」が出る（ドライバは要らない）。
+リボンや濃さは印刷ダイアログには出ないので、起動するときに `--ribbon` / `--option`（PPD と同じキー）で決める。
+
+確かめたこと（2026-10-14、プリンタはつながず、印刷データをファイルに書かせて比べた）:
+
+- PWG ラスタ・Apple ラスタ・縦長のページを IPP で送ると、CUPS フィルタと 1 バイトも違わない出力になる（`tests/ipp.sh`）
+- macOS にドライバなしで（`lpadmin -m everywhere`）登録すると、用紙は最初から CR80 になり、macOS は Apple ラスタで送ってくる。
+  sample-card.pdf を `lp` で刷ると、PPD のドライバと同じカードになる（ページが 637 ドット、PPD では 638 ドットなので、半ドットほどずれる）
+- 用紙を縦長（54×85.6mm）で広告すると、横長の PDF が回されずに右が切れる。そのため PPD と同じく横長で広告している
+- `ippeveprinter` は 1 ジョブずつしか受けない（次のジョブには「使用中」と返し、macOS が待ってから送り直す）
+
+まだ確かめていないこと: 実機への USB の送信、プレビューなどの印刷ダイアログからの印刷、ログイン時に自動で起動すること（launchd）。
+また、`ippeveprinter` は CUPS 2 系に付いているもので、PPD と一緒に無くなるかもしれない。そのときは PAPPL などで同じものを作る
+（`evolis-ipp-print` が受け取ったラスタを `rastertoevolis` に渡す、という形は変わらない）。
 
 ## 参考にした資料とそのライセンス
 

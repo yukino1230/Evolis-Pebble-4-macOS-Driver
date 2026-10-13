@@ -1,0 +1,27 @@
+#!/bin/bash
+# ippeveprinter -c から呼ばれる印刷コマンド。$1 = 受け取った文書(PWG ラスタか Apple ラスタ)
+#
+# rastertoevolis(CUPS フィルタと同じもの)でプリンタへのコマンドにし、evolis-usb-send で USB に送る。
+# リボンなどは EVOLIS_OPTIONS に PPD と同じキーで渡す("EvolisRibbon=ymckos EvolisOverlay=chipiso" など)。
+# ippeveprinter に -D が付いているとき(試すとき)は、USB に送らずに標準出力(-D の先)に書く。
+set -u
+CONVERT="${EVOLIS_CONVERT:-/usr/local/libexec/cups/filter/rastertoevolis}"
+SEND="${EVOLIS_SEND:-/usr/local/bin/evolis-usb-send}"
+
+case "${CONTENT_TYPE:-}" in
+  image/pwg-raster|image/urf|application/octet-stream|"") ;;
+  *) echo "ERROR: Unsupported document format: $CONTENT_TYPE" >&2; exit 1 ;;
+esac
+convert() {
+  "$CONVERT" "${IPP_JOB_ID:-1}" "${IPP_JOB_ORIGINATING_USER_NAME:-user}" "${IPP_JOB_NAME:-card}" 1 \
+             "${EVOLIS_OPTIONS:-}" "$1"
+}
+if [ -n "${DEVICE_URI:-}" ]; then
+  convert "$1"
+  exit
+fi
+# 全部変換できてから送る(途中で失敗したときに、半端なデータをプリンタに送らない)
+OUT="$(mktemp "${TMPDIR:-/tmp}/evolis-ipp.XXXXXX")" || exit 1
+trap 'rm -f "$OUT"' EXIT
+convert "$1" > "$OUT" || exit 1
+"$SEND" < "$OUT"

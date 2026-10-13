@@ -11,6 +11,8 @@
   rle         color と同じ絵を v2 (RLE 圧縮) で
   blank2      1 ページ目が真っ白、2 ページ目が color
   a4          A4 (2480x3508) の 8bit。用紙サイズの間違いで止まるか
+  urf         color と同じ絵を Apple ラスタ (URF、AirPrint の形式) で
+  urfgray     gray と同じ絵を Apple ラスタで。行の右端の白は「残りを白で埋める」で書く
 """
 import struct
 import sys
@@ -91,16 +93,21 @@ def mono_rows(gray, w):
     return out
 
 
-def rle(rows, px):
-    """CUPS ラスタ v2 の圧縮: 行ごとに「繰り返し数 - 1」、続けて同じ画素の繰り返しか、そのままの画素の並び"""
+def rle(rows, px, apple=False):
+    """CUPS ラスタ v2 の圧縮: 行ごとに「繰り返し数 - 1」、続けて同じ画素の繰り返しか、そのままの画素の並び。
+    apple なら、行の右端に続く白を 128(残りを白で埋める)で書く"""
     out = bytearray()
     for r in rows:
         out.append(0)
         pixels = [r[i:i + px] for i in range(0, len(r), px)]
+        end = len(pixels)
+        if apple:
+            while end > 0 and pixels[end - 1] == b"\xff" * px:
+                end -= 1
         i = 0
-        while i < len(pixels):
+        while i < end:
             j = i + 1
-            while j < len(pixels) and j - i < 128 and pixels[j] == pixels[i]:
+            while j < end and j - i < 128 and pixels[j] == pixels[i]:
                 j += 1
             if j - i > 1:
                 out.append(j - i - 1)
@@ -108,12 +115,14 @@ def rle(rows, px):
                 i = j
             else:
                 j = i + 1
-                while j < len(pixels) and j - i < 128 and (j + 1 >= len(pixels) or pixels[j] != pixels[j + 1]):
+                while j < end and j - i < 128 and (j + 1 >= end or pixels[j] != pixels[j + 1]):
                     j += 1
                 out.append(0 if j - i == 1 else 257 - (j - i))   # 1 画素だけなら「1 回繰り返し」で書く
                 for p in pixels[i:j]:
                     out += p
                 i = j
+        if end < len(pixels):
+            out.append(128)
     return bytes(out)
 
 
@@ -121,6 +130,18 @@ def page(rows, w, h, bpp, cspace, ncolors, compress=False):
     hdr, stride = header(w, h, bpp, cspace, ncolors)
     data = rle(rows, max(1, bpp // 8)) if compress else b"".join(rows)
     return hdr + data
+
+
+def urf(pages):
+    """Apple ラスタ: "UNIRAST\\0" + ページ数、ページごとに 32 バイトのヘッダと圧縮した画素"""
+    out = bytearray(b"UNIRAST\0" + struct.pack(">I", len(pages)))
+    for rows, w, h, bpp in pages:
+        hdr = bytearray(32)
+        hdr[0] = bpp
+        hdr[1] = 1 if bpp == 24 else 0           # sRGB / sGray
+        hdr[12:24] = struct.pack(">III", w, h, 300)
+        out += hdr + rle(rows, bpp // 8, apple=True)
+    return bytes(out)
 
 
 def main():
@@ -140,6 +161,12 @@ def main():
     elif kind == "blank2":
         white = [b"\xff" * (W * 3)] * H
         pages = [page(white, W, H, 24, 1, 3), page(rgb_image(W, H), W, H, 24, 1, 3)]
+    elif kind == "urf":
+        open(out, "wb").write(urf([(rgb_image(W, H), W, H, 24)]))
+        return
+    elif kind == "urfgray":
+        open(out, "wb").write(urf([(gray_rows(rgb_image(W, H)), W, H, 8)]))
+        return
     elif kind == "a4":
         pages = [page([b"\x80" * 2480] * 3508, 2480, 3508, 8, 18, 1)]
     else:

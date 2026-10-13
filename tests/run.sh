@@ -12,7 +12,7 @@ WORK="$ROOT/build/tests"
 mkdir -p "$WORK"
 
 clang -O2 -Wall -Werror -o "$WORK/rastertoevolis" "$ROOT"/driver/rastertoevolis.c "$ROOT"/driver/evolis_card.c
-for kind in color portrait gray mono rle blank2 a4; do
+for kind in color portrait gray mono rle blank2 a4 urf urfgray; do
   [ -s "$WORK/$kind.ras" ] || python3 "$HERE/make_raster.py" "$kind" "$WORK/$kind.ras"
 done
 # キューの PPD の既定値を読むか(DefaultEvolisRibbon を ymckos にしたもの)
@@ -40,6 +40,8 @@ mono         | mono     | EvolisRibbon=k                       |
 rle          | rle      | EvolisRibbon=ymckos                  |
 blank-page   | blank2   | EvolisRibbon=ymckos                  |
 a4           | a4       | EvolisRibbon=k                       |
+urf          | urf      | EvolisRibbon=ymckos                  |
+urf-gray     | urfgray  | EvolisRibbon=k                       |
 ppd-default  | color    |                                      | ppd
 ppd-override | color    | EvolisRibbon=k                       | ppd
 '

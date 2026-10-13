@@ -1,7 +1,8 @@
 /* CUPS フィルタ: CUPS ラスタ -> Evolis Pebble 4（片面）
  *
  * PDF のラスタライズは macOS 標準の cgpdftoraster が行うため外部依存はない。
- * 依存を作らないため libcups は使わず、ラスタを自前で解析する(PWG ラスタも同じ形式で読める)。
+ * 依存を作らないため libcups は使わず、ラスタを自前で解析する。CUPS ラスタ v2/v3 のほか、
+ * IPP Everywhere / AirPrint で届く PWG ラスタ(CUPS ラスタ v2 と同じ形式)と Apple ラスタ(URF)も読める。
  *
  * ここは CUPS の入口(ラスタの読み取り、PPD と印刷ダイアログのオプション、エラーの表示)だけで、
  * カードを刷るコマンドを作るところは evolis_card.c にある。
@@ -16,7 +17,7 @@
 #define HDRSIZE  1796      /* cups_page_header2_t */
 
 static FILE *in;
-static int   little, compressed;
+static int   little, compressed, apple;   /* apple = Apple ラスタ (URF) */
 
 /* メッセージの言語。CUPS はジョブの言語を LANG(ja_JP.UTF-8 など)でフィルタに渡す */
 static int lang_ja;
@@ -40,7 +41,9 @@ static size_t readn(void *buf, size_t n) {
     return got;
 }
 
-/* CUPS ラスタ v2 の RLE 展開 (v3 は無圧縮なので通常は通らない) */
+/* CUPS ラスタ v2 / PWG ラスタ / Apple ラスタの RLE 展開 (v3 は無圧縮なので通らない)。
+   行ごとに「繰り返し数 - 1」、続けて n < 128 なら同じ画素を n + 1 個、n > 128 なら 257 - n 個の画素がそのまま並ぶ。
+   Apple ラスタだけは n = 128 が「行の残りを白で埋める」 */
 static int unrle(unsigned char *out, unsigned stride, unsigned height, unsigned bpp) {
     unsigned px = (bpp + 7) / 8; if (!px) px = 1;
     unsigned char *line = malloc(stride);
@@ -53,7 +56,9 @@ static int unrle(unsigned char *out, unsigned stride, unsigned height, unsigned 
         while (len < stride) {
             int n = fgetc(in);
             if (n == EOF) break;
-            if (n < 128) {
+            if (apple && n == 128) {
+                while (len < stride) line[len++] = 0xff;
+            } else if (n < 128) {
                 unsigned char pix[8];
                 if (readn(pix, px) != px) break;
                 for (int i = 0; i <= n && len < stride; i++)
@@ -106,24 +111,43 @@ int main(int argc, char **argv) {
     in = (argc > 6) ? fopen(argv[6], "rb") : stdin;
     if (!in) { logmsg("ERROR", T("Cannot open the input", "入力を開けません")); return 1; }
     if (readn(magic, 4) != 4) { logmsg("ERROR", T("The input is empty", "入力が空です")); return 1; }
-    if      (!memcmp(magic, "RaS2", 4)) { little = 0; compressed = 1; }
+    if (!memcmp(magic, "UNIR", 4)) {                  /* "UNIRAST\0" + ページ数 (4 バイト) */
+        unsigned char rest[8];
+        if (readn(rest, 8) != 8 || memcmp(rest, "AST", 4)) {
+            logmsg("ERROR", T("Not a CUPS, PWG or Apple raster", "CUPS / PWG / Apple ラスタではありません")); return 1;
+        }
+        apple = 1; little = 0; compressed = 1;
+    }
+    else if (!memcmp(magic, "RaS2", 4)) { little = 0; compressed = 1; }
     else if (!memcmp(magic, "2SaR", 4)) { little = 1; compressed = 1; }
     else if (!memcmp(magic, "RaS3", 4)) { little = 0; compressed = 0; }
     else if (!memcmp(magic, "3SaR", 4)) { little = 1; compressed = 0; }
-    else { logmsg("ERROR", T("Not a CUPS raster", "CUPS ラスタではありません")); return 1; }
+    else { logmsg("ERROR", T("Not a CUPS, PWG or Apple raster", "CUPS / PWG / Apple ラスタではありません")); return 1; }
 
     for (;;) {
         unsigned char hdr[HDRSIZE];
         unsigned hdpi, vdpi, w, h, bpp, stride, cspace;
         unsigned char *ras;
-        if (readn(hdr, HDRSIZE) != HDRSIZE) break;
-        hdpi   = rd32(hdr + 276);
-        vdpi   = rd32(hdr + 280);
-        w      = rd32(hdr + 372);
-        h      = rd32(hdr + 376);
-        bpp    = rd32(hdr + 388);
-        stride = rd32(hdr + 392);
-        cspace = rd32(hdr + 400);
+        if (apple) {
+            /* Apple ラスタのページヘッダ (32 バイト): 0 = 1 画素のビット数、1 = 色空間、
+               12 = 幅、16 = 高さ、20 = 解像度 (dpi)。8bit はグレー、24bit は sRGB として読む */
+            if (readn(hdr, 32) != 32) break;
+            bpp    = hdr[0];
+            w      = rd32(hdr + 12);
+            h      = rd32(hdr + 16);
+            hdpi   = vdpi = rd32(hdr + 20);
+            stride = w * bpp / 8;
+            cspace = bpp == 8 ? 18 : 19;
+        } else {
+            if (readn(hdr, HDRSIZE) != HDRSIZE) break;
+            hdpi   = rd32(hdr + 276);
+            vdpi   = rd32(hdr + 280);
+            w      = rd32(hdr + 372);
+            h      = rd32(hdr + 376);
+            bpp    = rd32(hdr + 388);
+            stride = rd32(hdr + 392);
+            cspace = rd32(hdr + 400);
+        }
         if (bpp != 1 && bpp != 8 && bpp != 24) {
             logmsg("ERROR", T("Only 1, 8 and 24 bits per pixel are supported (bpp=%u)",
                                 "1/8/24bit 以外は非対応です (bpp=%u)"), bpp); return 1;

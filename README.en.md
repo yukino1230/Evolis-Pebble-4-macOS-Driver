@@ -114,7 +114,8 @@ sudo driver/install.sh --ribbon k      # build and install in place without a pk
 Set `EVOLIS_NOTARY=<notarytool profile name>` to notarize as well.
 
 After changing the filter, run `tests/run.sh` to check that what gets printed has not changed (it compares the bytes sent to the
-printer for 7 test rasters and 22 option combinations). When you change the output on purpose, record it again with `tests/run.sh --update`.
+printer for 9 test rasters and 24 option combinations). When you change the output on purpose, record it again with `tests/run.sh --update`.
+`tests/ipp.sh` checks that the Printer Application prototype (see "When PPDs stop working" below) gives the same output.
 
 ## Background (research as of 2026-10-13)
 
@@ -557,14 +558,40 @@ To be ready for that, the code is split in two:
 - **[`driver/rastertoevolis.c`](driver/rastertoevolis.c)** (CUPS front end): reads CUPS raster, passes the PPD and print dialog options
   to the core, and reports errors to the queue
 
-An IPP Everywhere printer receives PWG raster (`image/pwg-raster`), which has the same format as CUPS raster v2, so the current reader
-works as is. A migration would be a Printer Application (for example with [PAPPL](https://www.msweet.org/pappl/), which runs on macOS) that
+An IPP Everywhere / AirPrint printer receives PWG raster (`image/pwg-raster`, the same format as CUPS raster v2) or
+Apple raster (`image/urf`), and `rastertoevolis` reads both.
 
-- accepts PWG raster at 300 dpi, RGB 8-bit, with CR80 as the only media
-- passes each page through `evolis_place` → `evolis_print_card` and sends the result to the printer over USB
-- lets you pick the ribbon and densities in the Printer Application's settings (or Evolis Utility), since the print dialog may not show them
+#### Printer Application prototype ([`ipp/`](ipp/))
 
-and would print exactly what the driver prints today (comparable with the records of `tests/run.sh`).
+There is a prototype built on `ippeveprinter`, which ships with macOS (it comes with CUPS and acts as an IPP Everywhere printer).
+It needs no PAPPL or other installs.
+
+- [`ipp/evolis-pebble4.conf`](ipp/evolis-pebble4.conf): IPP attributes. 300 dpi, sRGB / gray 8-bit, CR80 (landscape, borderless) as the only media
+- [`ipp/evolis-ipp-print`](ipp/evolis-ipp-print): runs for each job, converts the raster with `rastertoevolis`, and sends it to the printer with
+  [`evolis-usb-send`](driver/evolis-usb-send.swift) (the same USB code as Evolis Utility)
+- [`ipp/evolis-ipp-server`](ipp/evolis-ipp-server): starts `ippeveprinter` with the two above
+
+```bash
+ipp/evolis-ipp-server --ribbon ymckos                       # Ctrl-C to stop
+ipp/evolis-ipp-server --ribbon k --option EvolisOverlay=none --output /tmp/evolis   # write files instead of sending over USB
+```
+
+It advertises itself over DNS-SD, so "Evolis Pebble 4" shows up when adding a printer in System Settings → Printers & Scanners
+(no driver needed). Ribbon and densities do not appear in the print dialog, so set them when starting it with `--ribbon` / `--option`
+(the same keys as the PPD).
+
+Verified (2026-10-14, without the printer, by having the print data written to files):
+
+- PWG raster, Apple raster and portrait pages sent over IPP produce output identical to the CUPS filter, byte for byte (`tests/ipp.sh`)
+- Added to macOS without a driver (`lpadmin -m everywhere`), the paper size is CR80 from the start and macOS sends Apple raster.
+  Printing sample-card.pdf with `lp` gives the same card as the PPD driver (the page is 637 dots tall vs 638 with the PPD, about half a dot of shift)
+- Advertising the media as portrait (54 × 85.6 mm) makes macOS put a landscape PDF on it unrotated, cutting off the right side,
+  so it is advertised as landscape, like the PPD
+- `ippeveprinter` takes one job at a time (it answers "busy" to the next one, and macOS waits and resends)
+
+Not yet verified: sending to the real printer over USB, printing from a print dialog such as Preview's, and starting automatically at
+login (launchd). Also, `ippeveprinter` ships with CUPS 2.x and may go away together with PPDs; then the same thing would be built with
+PAPPL or similar (the shape, where `evolis-ipp-print` hands the received raster to `rastertoevolis`, stays the same).
 
 ## References and their licenses
 
