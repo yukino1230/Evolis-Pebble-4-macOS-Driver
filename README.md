@@ -15,7 +15,7 @@ Evolis は現行の macOS ドライバを Pebble 世代には出していませ�
 
 | | |
 |---|---|
-| コマンドリファレンス | **公式の Evolis Card Printers Programming Guide A5013** が New Pebble / Tattoo / Dualys / Quantum / Kiosk をカバー。[Rev.D2 は表紙が "NEW PEBBLE PROGRAMMING GUIDE"](https://www.yumpu.com/en/document/view/54519120/new-pebble-programming-guide-a5013-revd2/9)。コマンドの詳細は [Qu2 版の写し](https://idoc.pub/documents/programming-guide-evolis-qu2-en5k9g7wqpno)と、手元の Rev.E（公開していない）で確認した |
+| コマンドリファレンス | **公式の Evolis Card Printers Programming Guide A5013** が New Pebble / Tattoo / Dualys / Quantum / Kiosk をカバー。**このリポジトリで「A5013」と書いているのは Rev.E**（手元の PDF。著作物なので公開していない）。ネット上には [Rev.D2](https://www.yumpu.com/en/document/view/54519120/new-pebble-programming-guide-a5013-revd2/9)（表紙が "NEW PEBBLE PROGRAMMING GUIDE"）や [Qu2 版](https://idoc.pub/documents/programming-guide-evolis-qu2-en5k9g7wqpno)の写しがある |
 | 公式 Linux ドライバ | 2014年12月に **Pebble 2 / 3 / 4** を含む世代向けの RPM / DEB が出ている（現在はレガシー扱い） |
 | 公式 macOS ドライバ | [現行の互換性表](https://www.evolis.com/wp-content/uploads/2022/05/Drivers-Compatibility-Chart-ENG.pdf)に **Pebble の行は無い** |
 | オープンソースの実装例 | [dpavlin/Printer-EVOLIS](https://github.com/dpavlin/Printer-EVOLIS)（Dualys 3 向け、Perl、GPLv2+）。実際に送るバイト列が読める |
@@ -101,7 +101,7 @@ cd tools
 
 ### カラー（YMCKO）の印刷（2026-10-13、ツールから成功）
 
-[A5013](https://idoc.pub/documents/programming-guide-evolis-qu2-en5k9g7wqpno) と
+A5013（Rev.E）と
 [qz-tray の実装](https://github.com/qzind/tray/blob/master/src/qz/printer/action/raw/converter/Evolis.java)に従った形で刷れた。
 
 ```
@@ -285,7 +285,8 @@ sudo driver/install.sh --uninstall
 
 | 資料 | ライセンス | 参考にしたこと |
 |---|---|---|
-| Evolis Card Printers Programming Guide A5013（[Rev.D2](https://www.yumpu.com/en/document/view/54519120/new-pebble-programming-guide-a5013-revd2/9)、[Qu2 版](https://idoc.pub/documents/programming-guide-evolis-qu2-en5k9g7wqpno)） | Evolis 社の著作物 | コマンドの一覧と意味（`Pr` `Pc` `Db` `Rc` など）。文章は転載していない |
+| Evolis Card Printers Programming Guide A5013 **Rev.E**（手元の PDF。公開していない） | Evolis 社の著作物 | コマンドの一覧と意味（`Pr` `Pc` `Db` `Rc` など）。文章は転載していない |
+| 同 A5013 のネット上の写し（[Rev.D2](https://www.yumpu.com/en/document/view/54519120/new-pebble-programming-guide-a5013-revd2/9)、[Qu2 版](https://idoc.pub/documents/programming-guide-evolis-qu2-en5k9g7wqpno)） | Evolis 社の著作物 | Rev.E を手に入れる前に参照した。内容はほぼ同じ |
 | [dpavlin/Printer-EVOLIS](https://github.com/dpavlin/Printer-EVOLIS) | GPLv2 以降 | 黒の片面印刷のコマンドの並びと、ビットマップの形（1016×648、90° 回転、1bit） |
 | [qzind/tray](https://github.com/qzind/tray)（`Evolis.java`） | LGPL-2.1 | Y/M/C を 32 段階で送るときのビットの詰め方 |
 | [NEC MultiImpact 700XX の macOS ドライバ](https://github.com/yukino1230/multiimpact-700xx-macos-driver) | MIT（同じ作者） | CUPS フィルタ・PPD・`install.sh` の作り方（同じ作り方で書いた） |

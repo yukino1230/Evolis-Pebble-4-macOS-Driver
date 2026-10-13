@@ -3,7 +3,7 @@
  * PDF のラスタライズは macOS 標準の cgpdftoraster が行うため外部依存はない。
  * 依存を作らないため libcups は使わず、ラスタを自前で解析する。
  *
- * コマンド (Evolis Programming Guide A5013 / 実機で確認):
+ * コマンド (Evolis Card Printers Programming Guide A5013 Rev.E / 実機で確認):
  *   ESC Pr;<ribbon> CR      リボンの種類 (RIBBONS の表)。本体に保存される。
  *                           実際のリボンと違うとカードが詰まる
  *   ESC Ss CR               シーケンス開始（カード1枚）
