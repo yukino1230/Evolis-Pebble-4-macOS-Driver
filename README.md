@@ -179,6 +179,10 @@ ESC Se CR
 - A5013 の `Db` の説明にはデータの大きさが 84,624 / 423,120 バイトと載っているが、同じページの式
   （648 × 1016 × ビット数 ÷ 8）で出る 82,296 / 411,480 バイトで刷れている
 - ほぼ黒の無彩色（RGB の各値が 24 未満、差も 24 未満）だけを黒パネルに回し、それ以外は Y/M/C で刷る
+- **ドライバは Y/M/C を 128 段階（`Db;y;128`、1 ドット 7bit、1 パネル 576,072 バイト）で送る。** 上の例は最初に試した 32 段階。
+  C / M / Y / グレーのグラデーションを 32 段階と 128 段階で 1 枚ずつ刷って比べると、128 段階の方が段差が小さかった
+  （帯に沿った明るさのずれの標準偏差: グレー 1.45 → 1.05、マゼンタ 0.94 → 0.71。イエローとシアンはほぼ同じ）。
+  公式の古い macOS 用フィルタも 128 段階で送る処理を持っている。32 段階に戻すには、ジョブに `EvolisColorLevels=32` を付ける
 - **黒パネルの網点は、点を散らす誤差拡散だと 60% 前後で真っ黒に潰れる**（樹脂の黒が 1 ドットごとににじむ）。
   点を中心から太らせる 6×6 の網点（50 線）にして、[目盛りカード](tools/make_halftone_cal.py)で測った補正をかけている。
   R3013 の黒パネルで刷って測った結果（指定 % → 見た目の %）:
@@ -393,8 +397,9 @@ libcups にも Ghostscript にも依存しない。
 |---|---|---|
 | Evolis Card Printers Programming Guide A5013 **Rev.E**（手元の PDF。公開していない） | Evolis 社の著作物 | コマンドの一覧と意味（`Pr` `Pc` `Db` `Rc` など）。文章は転載していない |
 | 同 A5013 のネット上の写し（[Rev.D2](https://www.yumpu.com/en/document/view/54519120/new-pebble-programming-guide-a5013-revd2/9)、[Qu2 版](https://idoc.pub/documents/programming-guide-evolis-qu2-en5k9g7wqpno)） | Evolis 社の著作物 | Rev.E を手に入れる前に参照した。内容はほぼ同じ |
+| Evolis 公式の macOS 用ドライバ 4.13.49.26（macOS 10.11 まで。手元に置いて、公開していない） | Evolis 社の著作物 | PPD のオプションの一覧と、フィルタのプログラムに含まれる文字列からコマンドの書式（`Db;y;128` など）を読んだ。プログラムは実行しておらず、コードも持ち込んでいない |
 | [dpavlin/Printer-EVOLIS](https://github.com/dpavlin/Printer-EVOLIS) | GPLv2 以降 | 黒の片面印刷のコマンドの並びと、ビットマップの形（1016×648、90° 回転、1bit） |
-| [qzind/tray](https://github.com/qzind/tray)（`Evolis.java`） | LGPL-2.1 | Y/M/C を 32 段階で送るときのビットの詰め方 |
+| [qzind/tray](https://github.com/qzind/tray)（`Evolis.java`） | LGPL-2.1 | Y/M/C を段階数に応じたビット数で詰めて送る方法 |
 | [NEC MultiImpact 700XX の macOS ドライバ](https://github.com/yukino1230/multiimpact-700xx-macos-driver) | MIT（同じ作者） | CUPS フィルタ・PPD・`install.sh` の作り方（同じ作り方で書いた） |
 
 ## 非公式・商標について

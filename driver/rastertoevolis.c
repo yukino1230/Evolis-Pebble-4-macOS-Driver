@@ -10,7 +10,7 @@
  *   ESC Sr CR               表面
  *   ESC Db;<p>;<n>;<data> CR パネル p (y/m/c/k/o) のビットマップ。1016x648 ドットのカードを
  *                           時計回りに90°回し、1行 648 ドット x 1016 行。
- *                           n=32 は 1 ドット 5bit (インク量, 0 = 塗らない)、n=2 は 1bit (1 = 塗る)。
+ *                           n=32/64/128 は 1 ドット 5/6/7bit (インク量, 0 = 塗らない)、n=2 は 1bit (1 = 塗る)。
  *                           どちらもビット単位で隙間なく詰め、MSB が先
  *   ESC Se CR               シーケンス終了（印刷して排出）
  */
@@ -80,7 +80,9 @@ static int unrle(unsigned char *out, unsigned stride, unsigned height, unsigned 
 
 static void esc(const char *cmd) { printf("\033%s\r", cmd); }
 
-#define LEVELS     32      /* Y/M/C の階調 (5bit) */
+/* Y/M/C の階調。Db の段階数 32 / 64 / 128 は 1 ドット 5 / 6 / 7bit。
+   128 の方がグラデーションの段差が小さい(実機で確認)。EvolisColorLevels で変えられる */
+static int levels = 128, level_bits = 7;
 #define HALF_W    430      /* ハーフパネル(R3013)で色が乗る幅。左端から。実機で約435 */
 #define K_MAX      24      /* これより暗い無彩色は黒パネルで刷る(文字をくっきりさせる) */
 #define K_CHROMA   24
@@ -218,16 +220,16 @@ static void print_card(const struct ribbon *r) {
             for (int i = 1; i < 3; i++) { if (p[i] > hi) hi = p[i]; if (p[i] < lo) lo = p[i]; }
             k[py][px] = hi < K_MAX && hi - lo < K_CHROMA;
             if (k[py][px]) continue;
-            c[py][px] = (unsigned char)(((255 - p[0]) * (LEVELS - 1) + 127) / 255);
-            m[py][px] = (unsigned char)(((255 - p[1]) * (LEVELS - 1) + 127) / 255);
-            y[py][px] = (unsigned char)(((255 - p[2]) * (LEVELS - 1) + 127) / 255);
+            c[py][px] = (unsigned char)(((255 - p[0]) * (levels - 1) + 127) / 255);
+            m[py][px] = (unsigned char)(((255 - p[1]) * (levels - 1) + 127) / 255);
+            y[py][px] = (unsigned char)(((255 - p[2]) * (levels - 1) + 127) / 255);
         }
     esc("Ss");
     esc("Sr");
     if (r->color_w) {
-        put_panel("y", LEVELS, 5, y);
-        put_panel("m", LEVELS, 5, m);
-        put_panel("c", LEVELS, 5, c);
+        put_panel("y", levels, level_bits, y);
+        put_panel("m", levels, level_bits, m);
+        put_panel("c", levels, level_bits, c);
     }
     put_panel("k", 2, 1, k);
     if (r->overlay) put_panel("o", 2, 1, o);
@@ -241,6 +243,9 @@ static void set_option(const char *key, const char *val) {
     if (!strcmp(key, "EvolisRibbon")) {
         for (int i = 0; i < NRIBBONS; i++)
             if (!strcmp(val, RIBBONS[i].name)) ribbon = &RIBBONS[i];
+    } else if (!strcmp(key, "EvolisColorLevels")) {
+        int v = atoi(val);
+        if (v == 32 || v == 64 || v == 128) { levels = v; level_bits = v == 32 ? 5 : v == 64 ? 6 : 7; }
     } else if (!strcmp(key, "EvolisContrastK") || !strcmp(key, "EvolisContrastColor")) {
         int v = atoi(val);
         if (v < 0 || v > 20) return;
