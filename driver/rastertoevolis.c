@@ -85,7 +85,6 @@ static void esc(const char *cmd) { printf("\033%s\r", cmd); }
 #define K_MAX      24      /* これより暗い無彩色は黒パネルで刷る(文字をくっきりさせる) */
 #define K_CHROMA   24
 #define WHITE_MIN 230      /* これより明るいものは白(網点の白抜きを守る) */
-#define SOLID_FROM 60      /* 黒パネルで、この濃さ(%)以上の色は網点にせず黒ベタで刷る */
 
 enum { RIB_K, RIB_YMCKO, RIB_YMCKOS };
 
@@ -149,14 +148,12 @@ static float tone(float want) {
 }
 
 static void halftone(unsigned char k[CARD_H][CARD_W]) {
-    /* 明るさ -> 網点のしきい値と比べる値 (0..36)。濃い色は網点だと薄く見えて
-       締まらないので、SOLID_FROM 以上は黒ベタ(255 = 網点にしない印) */
+    /* 色は明るさだけのグレーにして網点で刷る。明るさ -> しきい値と比べる値 (0..36)。
+       36 は全部の点を打つ = 黒ベタ(真っ黒な文字など) */
     unsigned char lut[256];
     static unsigned char white[CARD_H][CARD_W];
-    for (int v = 0; v < 256; v++) {
-        float want = (255 - v) * 100.0f / 255;
-        lut[v] = want >= SOLID_FROM ? 255 : (unsigned char)(tone(want) * 36 / 100 + 0.5f);
-    }
+    for (int v = 0; v < 256; v++)
+        lut[v] = (unsigned char)(tone((255 - v) * 100.0f / 255) * 36 / 100 + 0.5f);
     for (int y = 0; y < CARD_H; y++)
         for (int x = 0; x < CARD_W; x++) {
             const unsigned char *p = canvas[y][x];
@@ -166,12 +163,12 @@ static void halftone(unsigned char k[CARD_H][CARD_W]) {
         }
     /* 網点の部分では、白のすぐ隣(上下左右と斜め1ドット)に点を打たない。網点は粗く、
        樹脂の黒は1ドットぶんにじむので、そのままだと網点の上の白抜き文字が埋まる。
-       黒ベタの部分は黒い文字と同じく削らない */
+       黒ベタ(黒い文字など)は削らない */
     for (int y = 0; y < CARD_H; y++)
         for (int x = 0; x < CARD_W; x++) {
             const unsigned char *p = canvas[y][x];
             int v = (299 * p[0] + 587 * p[1] + 114 * p[2] + 500) / 1000;
-            if (!k[y][x] || lut[v] == 255) continue;
+            if (!k[y][x] || lut[v] >= 36) continue;
             for (int dy = -1; dy <= 1; dy++)
                 for (int dx = -1; dx <= 1; dx++) {
                     int yy = y + dy, xx = x + dx;
