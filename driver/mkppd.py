@@ -8,6 +8,21 @@ import sys
 MM = 72 / 25.4
 W, H = round(85.6 * MM, 2), round(54.0 * MM, 2)   # CR80 (ISO/IEC 7810 ID-1)、横長
 FILTER = "/usr/local/libexec/cups/filter/rastertoevolis"
+# Pr に送る値と表示名。driver/rastertoevolis.c の RIBBONS と合わせる
+RIBBONS = [
+    ("k", "黒 (モノクロ)"),
+    ("ymcko", "YMCKO カラー (全面パネル)"),
+    ("ymckos", "YMCKO カラー (ハーフパネル R3013 など)"),
+    ("ko", "黒 + オーバーレイ (KO)"),
+    ("kw", "白 (モノクロ)"),
+    ("kr", "赤 (モノクロ)"),
+    ("kbl", "青 (モノクロ)"),
+    ("kgr", "緑 (モノクロ)"),
+    ("kgo", "金 (モノクロ)"),
+    ("ksi", "銀 (モノクロ)"),
+    ("ksc", "スクラッチ (モノクロ)"),
+    ("ka", "黒ワックス (モノクロ)"),
+]
 
 
 def main():
@@ -48,13 +63,12 @@ def main():
     w('*OpenUI *EvolisRibbon/リボン: PickOne')
     w('*OrderDependency: 10 AnySetup *EvolisRibbon')
     w('*DefaultEvolisRibbon: k')
-    w('*EvolisRibbon k/黒 (モノクロ): ""')
-    w('*EvolisRibbon ymcko/YMCKO カラー (全面パネル): ""')
-    w('*EvolisRibbon ymckos/YMCKO カラー (ハーフパネル R3013 など): ""')
+    for v, label in RIBBONS:
+        w(f'*EvolisRibbon {v}/{label}: ""')
     w('*CloseUI: *EvolisRibbon')
     w('')
     # コントラスト (Pc)。本体は 0..20、工場出荷時 10。黒の網点の補正は 10 で測ったもの
-    for key, label, order in (("EvolisContrastK", "黒の濃さ", 20),
+    for key, label, order in (("EvolisContrastK", "黒 / 単色リボンの濃さ", 20),
                               ("EvolisContrastColor", "カラーの濃さ (カラーリボン)", 30)):
         w(f'*OpenUI *{key}/{label}: PickOne')
         w(f'*OrderDependency: {order} AnySetup *{key}')

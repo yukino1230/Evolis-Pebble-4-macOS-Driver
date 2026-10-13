@@ -4,7 +4,7 @@
  * 依存を作らないため libcups は使わず、ラスタを自前で解析する。
  *
  * コマンド (Evolis Programming Guide A5013 / 実機で確認):
- *   ESC Pr;<ribbon> CR      リボンの種類 k / ymcko / ymckos(ハーフパネル)。本体に保存される。
+ *   ESC Pr;<ribbon> CR      リボンの種類 (RIBBONS の表)。本体に保存される。
  *                           実際のリボンと違うとカードが詰まる
  *   ESC Ss CR               シーケンス開始（カード1枚）
  *   ESC Sr CR               表面
@@ -85,7 +85,26 @@ static void esc(const char *cmd) { printf("\033%s\r", cmd); }
 #define K_MAX      24      /* これより暗い無彩色は黒パネルで刷る(文字をくっきりさせる) */
 #define K_CHROMA   24
 
-enum { RIB_K, RIB_YMCKO, RIB_YMCKOS };
+/* リボンの種類。color_w は Y/M/C が乗る幅(0 = 単色リボン)、overlay は全面に保護層を乗せるか。
+   単色リボンはどれも k パネル 1 枚で、画像の暗いところにリボンの色が乗る */
+static const struct ribbon {
+    const char *name;       /* Pr に送る値 = PPD の EvolisRibbon の値 */
+    int color_w, overlay;
+} RIBBONS[] = {
+    { "k",      0,      0 },   /* 黒 */
+    { "ymcko",  CARD_W, 1 },   /* YMCKO 全面パネル */
+    { "ymckos", HALF_W, 1 },   /* YMCKO ハーフパネル (R3013 など) */
+    { "ko",     0,      1 },   /* 黒 + オーバーレイ */
+    { "kw",     0,      0 },   /* 白 */
+    { "kr",     0,      0 },   /* 赤 */
+    { "kbl",    0,      0 },   /* 青 */
+    { "kgr",    0,      0 },   /* 緑 */
+    { "kgo",    0,      0 },   /* 金 */
+    { "ksi",    0,      0 },   /* 銀 */
+    { "ksc",    0,      0 },   /* スクラッチ */
+    { "ka",     0,      0 },   /* 黒ワックス */
+};
+#define NRIBBONS (int)(sizeof RIBBONS / sizeof *RIBBONS)
 
 /* カード(横長 1016x648)の RGB。ラスタを中央に置き、縦長なら時計回りに90°回す */
 static unsigned char canvas[CARD_H][CARD_W][3];
@@ -175,48 +194,44 @@ static void put_panel(const char *name, int levels, unsigned bits,
     fputc('\r', stdout);
 }
 
-static void print_card(int ribbon) {
+static void print_card(const struct ribbon *r) {
     static unsigned char y[CARD_H][CARD_W], m[CARD_H][CARD_W], c[CARD_H][CARD_W],
                          k[CARD_H][CARD_W], o[CARD_H][CARD_W];
 
     halftone(k);
-    if (ribbon != RIB_K) {
-        int color_w = ribbon == RIB_YMCKOS ? HALF_W : CARD_W;
-        for (int py = 0; py < CARD_H; py++)
-            for (int px = 0; px < CARD_W; px++) {
-                const unsigned char *p = canvas[py][px];
-                int hi = p[0], lo = p[0];
-                y[py][px] = m[py][px] = c[py][px] = 0;
-                o[py][px] = 1;                            /* 保護層は全面 */
-                if (px >= color_w) continue;              /* 色が乗らない範囲は黒のディザ */
-                for (int i = 1; i < 3; i++) { if (p[i] > hi) hi = p[i]; if (p[i] < lo) lo = p[i]; }
-                k[py][px] = hi < K_MAX && hi - lo < K_CHROMA;
-                if (k[py][px]) continue;
-                c[py][px] = (unsigned char)(((255 - p[0]) * (LEVELS - 1) + 127) / 255);
-                m[py][px] = (unsigned char)(((255 - p[1]) * (LEVELS - 1) + 127) / 255);
-                y[py][px] = (unsigned char)(((255 - p[2]) * (LEVELS - 1) + 127) / 255);
-            }
-    }
+    for (int py = 0; py < CARD_H; py++)
+        for (int px = 0; px < CARD_W; px++) {
+            const unsigned char *p = canvas[py][px];
+            int hi = p[0], lo = p[0];
+            y[py][px] = m[py][px] = c[py][px] = 0;
+            o[py][px] = 1;                                /* 保護層は全面 */
+            if (px >= r->color_w) continue;               /* 色が乗らない範囲は黒の網点 */
+            for (int i = 1; i < 3; i++) { if (p[i] > hi) hi = p[i]; if (p[i] < lo) lo = p[i]; }
+            k[py][px] = hi < K_MAX && hi - lo < K_CHROMA;
+            if (k[py][px]) continue;
+            c[py][px] = (unsigned char)(((255 - p[0]) * (LEVELS - 1) + 127) / 255);
+            m[py][px] = (unsigned char)(((255 - p[1]) * (LEVELS - 1) + 127) / 255);
+            y[py][px] = (unsigned char)(((255 - p[2]) * (LEVELS - 1) + 127) / 255);
+        }
     esc("Ss");
     esc("Sr");
-    if (ribbon != RIB_K) {
+    if (r->color_w) {
         put_panel("y", LEVELS, 5, y);
         put_panel("m", LEVELS, 5, m);
         put_panel("c", LEVELS, 5, c);
     }
     put_panel("k", 2, 1, k);
-    if (ribbon != RIB_K) put_panel("o", 2, 1, o);
+    if (r->overlay) put_panel("o", 2, 1, o);
     esc("Se");
 }
 
-static const char *ribbon_name[] = { "k", "ymcko", "ymckos" };
-static int ribbon = RIB_K;
+static const struct ribbon *ribbon = &RIBBONS[0];
 static int contrast_k = 10, contrast_color = 10;   /* Pc の値 0..20、工場出荷時 10 */
 
 static void set_option(const char *key, const char *val) {
     if (!strcmp(key, "EvolisRibbon")) {
-        for (int i = 0; i < 3; i++)
-            if (!strcmp(val, ribbon_name[i])) ribbon = i;
+        for (int i = 0; i < NRIBBONS; i++)
+            if (!strcmp(val, RIBBONS[i].name)) ribbon = &RIBBONS[i];
     } else if (!strcmp(key, "EvolisContrastK") || !strcmp(key, "EvolisContrastColor")) {
         int v = atoi(val);
         if (v < 0 || v > 20) return;
@@ -285,12 +300,12 @@ int main(int argc, char **argv) {
 
         if (pages == 0) {
             char cmd[16];
-            snprintf(cmd, sizeof cmd, "Pr;%s", ribbon_name[ribbon]);
+            snprintf(cmd, sizeof cmd, "Pr;%s", ribbon->name);
             esc(cmd);
             /* コントラストは本体に残るので、標準(10)でも毎回送る */
             snprintf(cmd, sizeof cmd, "Pc;k;=;%d", contrast_k);
             esc(cmd);
-            if (ribbon != RIB_K)
+            if (ribbon->color_w)
                 for (const char *p = "ymc"; *p; p++) {
                     snprintf(cmd, sizeof cmd, "Pc;%c;=;%d", *p, contrast_color);
                     esc(cmd);
@@ -298,7 +313,7 @@ int main(int argc, char **argv) {
         }
         print_card(ribbon);
         logmsg("INFO", "カード%d: %ux%u ドット %ubit リボン %s コントラスト 黒%d カラー%d",
-               pages + 1, w, h, bpp, ribbon_name[ribbon], contrast_k, contrast_color);
+               pages + 1, w, h, bpp, ribbon->name, contrast_k, contrast_color);
         pages++;
     }
     if (!pages) { logmsg("ERROR", "ページがありません"); return 1; }

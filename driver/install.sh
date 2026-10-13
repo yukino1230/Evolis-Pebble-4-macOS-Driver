@@ -2,6 +2,8 @@
 # Evolis Pebble 4 用 macOS ドライバのインストール
 #   sudo driver/install.sh [--ribbon k|ymcko|ymckos] [--queue Evolis_Pebble_4] [--uri usb://EVOLIS/Pebble?location=...]
 #     --ribbon は印刷ダイアログの既定のリボン(装着しているものに合わせる。既定 k)
+#       k 黒 / ymcko / ymckos(ハーフパネル) / ko 黒+オーバーレイ /
+#       kw 白 / kr 赤 / kbl 青 / kgr 緑 / kgo 金 / ksi 銀 / ksc スクラッチ / ka 黒ワックス
 #   sudo driver/install.sh --uninstall
 set -euo pipefail
 
@@ -19,7 +21,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-case "$RIBBON" in k|ymcko|ymckos) ;; *) echo "--ribbon は k / ymcko / ymckos のどれか"; exit 1 ;; esac
+case "$RIBBON" in k|ymcko|ymckos|ko|kw|kr|kbl|kgr|kgo|ksi|ksc|ka) ;;
+  *) echo "--ribbon は k / ymcko / ymckos / ko / kw / kr / kbl / kgr / kgo / ksi / ksc / ka のどれか"; exit 1 ;; esac
 [ "$(id -u)" = "0" ] || { echo "sudo で実行してください"; exit 1; }
 HERE="$(cd "$(dirname "$0")" && pwd)"
 FILTER=/usr/local/libexec/cups/filter/rastertoevolis

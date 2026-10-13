@@ -6,7 +6,7 @@ Evolis は現行の macOS ドライバを Pebble 世代には出していませ�
 > Driving the Evolis Pebble 4 ID card printer from macOS. Evolis ships no current macOS driver for
 > this generation, but the printer's command set is documented and the transport is USB printer class.
 
-**macOS の印刷ダイアログから印刷できます（2026-10-13、macOS 27.0.1 / Apple Silicon で確認）。** 黒（K）リボンと、カラー（YMCKO）リボンのハーフパネル（R3013）で実機確認済みです。全面パネルの YMCKO リボンは設定を用意してありますが、実機では試していません。Pebble 4 は片面専用の機種です。
+**macOS の印刷ダイアログから印刷できます（2026-10-13、macOS 27.0.1 / Apple Silicon で確認）。** 黒（K）リボンと、カラー（YMCKO）リボンのハーフパネル（R3013）で実機確認済みです。ほかのリボン（全面パネルの YMCKO、KO、白・金などの単色）は設定を用意してありますが、実機では試していません。Pebble 4 は片面専用の機種です。
 
 ## 分かっていること（2026-10-13 時点の調査）
 
@@ -134,6 +134,26 @@ cd tools
 ../.venv/bin/python evolis_print.py /tmp/colorcard.png --ribbon ymckos --send
 ```
 
+### リボンの種類（`Pr`）
+
+この Pebble 4 は、A5013 に載っているコードを小文字ならすべて受け付けた（`Pr` で設定して `Rr;p` で読み戻した）。
+大文字の `Ktc` などは `ERROR PARAMETRES`。
+
+| `Pr` の値 | 本体の表示 | 送るパネル | ドライバ | 実機 |
+|---|---|---|---|---|
+| `k`（`kb` も同じ） | k Black | K | ✅ | ✅ |
+| `ymcko` | ymcko | Y M C K O | ✅ | 未確認 |
+| `ymckos` | ymckos | Y M C K O（Y/M/C は左側だけ） | ✅ | ✅ R3013 |
+| `ko` | ko | K O | ✅ | 未確認 |
+| `kw` `kr` `kbl` `kgr` `kgo` `ksi` `ksc` | k White / Red / Blue / Green / Gold / Silver / Scratch | K | ✅ | 未確認 |
+| `ka` | k Wax Plastic | K | ✅ | 未確認 |
+| `ymckok` | ymckok | — | 見送り（2 つ目の K は両面機の裏面用。片面の Pebble 4 で何を送るか不明） | |
+| `h` `ho` | h | — | 見送り（ホログラム。データの形が不明） | |
+| `ktc` `ktp` | k Direct Thermal Card / Paper | — | 見送り（リボンを使わない専用カード） | |
+
+単色リボンはどれも K パネル 1 枚で、**画像の暗いところにリボンの色が乗る**（白リボンなら、黒く描いたところが白く刷られる）。
+未確認のものは、A5013 の書き方からの推測で送っている。
+
 ### コントラスト（`Pc`）
 
 | コマンド | 意味 |
@@ -161,8 +181,8 @@ libcups にも Ghostscript にも依存しない。
 | 解像度 | 300dpi、1bit 白黒 |
 | 1 ページ | カード 1 枚（ページごとに `Ss`〜`Se`） |
 | 配置 | 1011×638 ドットのラスタを、プリンタの 1016×648 の中央に置く。縦長のページは横向きに回す |
-| リボン | 黒 / YMCKO（全面パネル）/ YMCKO（ハーフパネル）。`install.sh --ribbon` で既定を決める |
-| 濃さ | 黒の濃さ・カラーの濃さを 0〜20（標準 10）で選べる。`Pc` で毎ジョブ送る |
+| リボン | 下の表のとおり。`install.sh --ribbon` で既定を決める |
+| 濃さ | 黒（単色リボン）の濃さ・カラーの濃さを 0〜20（標準 10）で選べる。`Pc` で毎ジョブ送る |
 
 ```bash
 xcode-select --install                 # clang が要る
