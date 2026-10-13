@@ -86,6 +86,8 @@ An app to see the printer's status and call its built-in functions. The pkg inst
 Applications folder, Launchpad or Spotlight. The PPD also sets `*APPrinterUtilityPath`, but current macOS (27) has no
 "Open Printer Utility" button in Printers & Scanners ("Options & Supplies" only has General and Supply Levels), so it cannot be opened from there.
 
+<img src="images/utility-en.png" alt="Evolis Utility window" width="600">
+
 - **Printer**: model, firmware, number of cards inserted, number of panels printed, print head kit number (`Rkn`)
 - **Settings stored in the printer**: ribbon type, black / color / overlay density, color brightness
 - **Cleaning**: whether cleaning is due (`Rlr;r`), number of cleanings, average and maximum interval
