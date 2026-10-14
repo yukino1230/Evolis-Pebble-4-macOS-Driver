@@ -54,7 +54,7 @@ struct ContentView: View {
                         printSettings
                         sharing
                     } else {
-                        Text("The Printer Application is not installed, or the printer is not registered. Run: sudo evolis-setup")
+                        Text("The Printer Application is not running, or the printer is not registered. Run in Terminal: sudo evolis-setup")
                             .foregroundStyle(.secondary)
                     }
                 }

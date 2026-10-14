@@ -98,11 +98,13 @@ fi
 # --- Printer Application ---
 [ -x "$APP" ] || { say "Printer Application not found: $APP (install the pkg)" \
                        "Printer Application がありません: $APP(pkg を入れてください)"; exit 1; }
-# 動いていなければ起動して、待ち受けるまで待つ
-launchctl print "system/$LABEL" >/dev/null 2>&1 || launchctl bootstrap system "/Library/LaunchDaemons/$LABEL.plist"
-for _ in $(seq 1 30); do [ -S /private/var/run/evolis-printer-app.sock ] && break; sleep 0.5; done
-[ -S /private/var/run/evolis-printer-app.sock ] || { say "The Printer Application did not start (see /Library/Logs/evolis-printer-app.log)" \
-                                                      "Printer Application が起動しません(/Library/Logs/evolis-printer-app.log を見てください)"; exit 1; }
+# 動いていなければ起動して、待ち受けるまで待つ。動いていないまま evolis-printer-app を呼ぶと、
+# 呼んだ人の権限で別のサーバが立ち上がってしまうので、launchd で動いていることを先に確かめる
+running() { launchctl print "system/$LABEL" 2>/dev/null | grep -q 'state = running'; }
+running || launchctl bootstrap system "/Library/LaunchDaemons/$LABEL.plist" 2>/dev/null || true
+for _ in $(seq 1 40); do running && lsof -nP -iTCP:8630 -sTCP:LISTEN >/dev/null 2>&1 && break; sleep 0.25; done
+running || { say "The Printer Application did not start (see /Library/Logs/evolis-printer-app.log)" \
+                 "Printer Application が起動しません(/Library/Logs/evolis-printer-app.log を見てください)"; exit 1; }
 # プリンタが無ければ足す(USB につないでいなくても足せる)。リボンは既定値として覚えさせる
 "$APP" printers | grep -qx "$PRINTER" || "$APP" add -d "$PRINTER" -v "$USB_URI" -m evolis_pebble4
 "$APP" modify -d "$PRINTER" -o evolis-ribbon="$RIBBON"

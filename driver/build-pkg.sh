@@ -97,9 +97,15 @@ if [ ! -f "$CONF" ]; then
                  "listen-hostname=localhost" "server-hostname=localhost" > "$CONF"
   chmod 644 "$CONF"
 fi
-launchctl bootout "system/$LABEL" 2>/dev/null || true
 mkdir -p /private/var/spool/evolis-printer-app
-launchctl bootstrap system "/Library/LaunchDaemons/$LABEL.plist" 2>/dev/null || launchctl kickstart -k "system/$LABEL" || true
+# 止めるのは非同期なので、止まりきってから起動する(止まる前に起動すると失敗し、動かないままになる)
+launchctl bootout "system/$LABEL" 2>/dev/null || true
+for _ in $(seq 1 40); do launchctl print "system/$LABEL" >/dev/null 2>&1 || break; sleep 0.25; done
+for _ in 1 2 3 4 5; do
+  launchctl bootstrap system "/Library/LaunchDaemons/$LABEL.plist" 2>/dev/null && break
+  launchctl print "system/$LABEL" >/dev/null 2>&1 && break
+  sleep 1
+done
 exit 0
 EOS
 chmod 755 "$BUILD/scripts/postinstall"

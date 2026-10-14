@@ -38,7 +38,10 @@ fi
 # PPD のキューが無ければ、Printer Application(evolis-printer-app)に送る
 APP=/usr/local/libexec/evolis/evolis-printer-app
 USE_APP=0
-if [ -z "$QUEUE" ] && [ -x "$APP" ] && "$APP" printers 2>/dev/null | grep -qx "Evolis Pebble 4"; then
+# Printer Application が動いていないときに呼ぶと、別のサーバが立ち上がってしまうので、先に確かめる
+if [ -z "$QUEUE" ] && [ -x "$APP" ] \
+   && launchctl print system/jp.yukino.evolis-printer-app 2>/dev/null | grep -q 'state = running' \
+   && "$APP" printers 2>/dev/null | grep -qx "Evolis Pebble 4"; then
   USE_APP=1; QUEUE="Evolis Pebble 4"
 fi
 [ -n "$QUEUE" ] || { say "No Evolis queue found. Specify it with --queue" "Evolis のキューが見つかりません。--queue で指定してください"; exit 1; }

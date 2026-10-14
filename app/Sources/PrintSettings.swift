@@ -95,6 +95,11 @@ final class PrintSettings: ObservableObject {
         loadShared()
         guard FileManager.default.isExecutableFile(atPath: Self.tool) else { available = false; return }
         Task.detached {
+            // 動いていないときに evolis-printer-app を呼ぶと、このユーザーで別のサーバが立ち上がってしまう
+            guard Self.serverRunning() else {
+                await MainActor.run { self.available = false; self.values = [:] }
+                return
+            }
             let result = Self.run(["options", "-d", Self.printer])
             var found: [String: String] = [:]
             // 既定値の行だけ後ろに括弧が付く("  -o evolis-ribbon=ymckos (default)")。
@@ -117,6 +122,10 @@ final class PrintSettings: ObservableObject {
         guard values[attr] != value else { return }
         values[attr] = value
         Task.detached {
+            guard Self.serverRunning() else {
+                await MainActor.run { self.available = false }
+                return
+            }
             let result = Self.run(["modify", "-d", Self.printer, "-o", "\(attr)=\(value)"])
             await MainActor.run {
                 self.error = result.status == 0 ? nil
@@ -124,6 +133,20 @@ final class PrintSettings: ObservableObject {
                 if result.status != 0 { self.load() }
             }
         }
+    }
+
+    /// Printer Application(LaunchDaemon)が動いているか
+    nonisolated static func serverRunning() -> Bool {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        p.arguments = ["print", "system/jp.yukino.evolis-printer-app"]
+        let pipe = Pipe()
+        p.standardOutput = pipe
+        p.standardError = Pipe()
+        guard (try? p.run()) != nil else { return false }
+        let out = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        p.waitUntilExit()
+        return p.terminationStatus == 0 && out.contains("state = running")
     }
 
     /// evolis-printer-app を動かして、出力と終了コードを返す
