@@ -86,6 +86,8 @@ so "Evolis Pebble 4" can be chosen from Print on iPhone and iPad.
 
 Tested on 2026-10-15: sample-card.pdf printed from an iPhone came out the same as from the Mac.
 
+<img src="images/iphone-printers.png" alt="Evolis Pebble 4 in the iPhone printer list" width="250"> <img src="images/iphone-options.png" alt="iPhone print options with 85.6 x 54mm paper" width="250">
+
 ### Moving from v1 (PPD driver)
 
 After installing the v2.0 pkg, run `evolis-setup` with the name of your current queue; that queue switches to the Printer Application.

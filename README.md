@@ -82,6 +82,8 @@ AirPrint のプリンタとして知らせるので、iPhone・iPad の「プリ
 
 2026-10-15 に、iPhone から sample-card.pdf を刷って、Mac から刷ったものと同じカードが出ることを確かめた。
 
+<img src="images/iphone-printers.png" alt="iPhone のプリンタの一覧に出た Evolis Pebble 4" width="250"> <img src="images/iphone-options.png" alt="iPhone の印刷のオプション。用紙は 85.6 × 54mm" width="250">
+
 ### v1（PPD のドライバ）から移る
 
 v2.0 の pkg を入れてから、今のキューと同じ名前で `evolis-setup` を実行すると、そのキューが Printer Application に切り替わる。
