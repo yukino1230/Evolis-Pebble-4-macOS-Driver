@@ -82,6 +82,7 @@ void evolis_set_option(evolis_options *o, const char *key, const char *val) {
 }
 
 const char *evolis_ribbon_name(int ribbon) { return RIBBONS[ribbon].name; }
+int evolis_ribbon_count(void) { return NRIBBONS; }
 const char *evolis_overlay_name(int overlay) { return OVERLAY_NAME[overlay]; }
 int evolis_ribbon_has_overlay(int ribbon) { return RIBBONS[ribbon].overlay; }
 

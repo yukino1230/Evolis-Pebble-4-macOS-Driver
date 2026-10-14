@@ -39,6 +39,7 @@ void evolis_set_option(evolis_options *o, const char *key, const char *val);
 
 /* 名前(ログ用)。リボンは Pr に送る値 = PPD の EvolisRibbon の値 */
 const char *evolis_ribbon_name(int ribbon);
+int evolis_ribbon_count(void);
 const char *evolis_overlay_name(int overlay);
 int evolis_ribbon_has_overlay(int ribbon);
 

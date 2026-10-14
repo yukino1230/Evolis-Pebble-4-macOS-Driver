@@ -1,0 +1,18 @@
+# Printer Application のテスト用: ラスタを 1 枚送る。tests/printer-app.sh から使う
+#   -d filetype=... -d name=... -f ファイル、独自属性は -d opts で渡せないので、必要なものを個別の変数で渡す
+{
+  OPERATION Print-Job
+  GROUP operation-attributes-tag
+  ATTR charset attributes-charset utf-8
+  ATTR naturalLanguage attributes-natural-language en
+  ATTR uri printer-uri $uri
+  ATTR name requesting-user-name test
+  ATTR name job-name $name
+  ATTR mimeMediaType document-format $filetype
+  GROUP job-attributes-tag
+  ATTR keyword evolis-ribbon $ribbon
+  ATTR keyword evolis-overlay $overlay
+  ATTR keyword evolis-black-mode $kmode
+  FILE $filename
+  STATUS successful-ok
+}
