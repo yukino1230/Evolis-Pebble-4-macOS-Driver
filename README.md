@@ -14,6 +14,9 @@ Evolis は現行の macOS ドライバを Pebble 世代には出していませ�
 > macOS に見え、リボンや濃さは Evolis Utility の「印刷の設定」タブで選ぶ。CUPS の PPD を使うドライバは将来の CUPS で廃止される予定なので、
 > その後も使えるようにした（[Printer Application](#printer-applicationv20-から標準)）。v1 の PPD のドライバも残してあり、`--ppd` で使える。
 
+> **v2.1 から、iPhone・iPad・ほかの Mac からも刷れる（AirPrint）。** Evolis Utility で共有をオンにする
+> （[iPhone・iPad・ほかの Mac から印刷する](#iphoneipadほかの-mac-から印刷するv21-から)）。
+
 > **表示は英語と日本語**（v1.2 から）。印刷ダイアログの項目、Evolis Utility、コマンド、キューに出るメッセージは、
 > macOS の言語設定に合わせて英語か日本語になる（v1.1 までは日本語だけ）。
 
@@ -47,6 +50,7 @@ sudo evolis-setup --ribbon k
 |---|---|
 | Printer Application（Intel / Apple Silicon 両対応） | `/usr/local/libexec/evolis/evolis-printer-app`（`/usr/local/bin/evolis-printer-app` からも呼べる） |
 | 自動で起動する設定 | `/Library/LaunchDaemons/jp.yukino.evolis-printer-app.plist` |
+| 共有するかの設定 | `/Library/Application Support/evolis-printer-app.conf`（`evolis-setup --share` / `--no-share` が書き換える） |
 | キューの登録コマンド | `/usr/local/bin/evolis-setup` |
 | 本体の機能を呼ぶコマンド | `/usr/local/bin/evolis-tool`（テストカード、技術テストカード、クリーニング） |
 | ユーティリティ | `/Applications/Evolis Utility.app`（プリンタの状態、印刷の設定、テストカード、クリーニング） |
@@ -61,6 +65,22 @@ sudo evolis-setup --ribbon k
 
 Printer Application は root で動き、この Mac の中（localhost）でだけ待ち受ける。ネットワークのほかの機器からは見えない。
 プリンタと設定は `/private/var/lib/evolis-printer-app.state`、ログは `/Library/Logs/evolis-printer-app.log`（`sudo` で読む）に残る。
+
+### iPhone・iPad・ほかの Mac から印刷する（v2.1 から）
+
+Evolis Utility の「印刷の設定」タブで「ほかの機器から印刷できるようにする」をオンにする（管理者のパスワードを聞かれる）。
+ターミナルなら `sudo evolis-setup --share`（やめるときは `--no-share`）。オンにすると Printer Application が同じネットワークに
+AirPrint のプリンタとして知らせるので、iPhone・iPad の「プリント」で「Evolis Pebble 4」を選べる。
+
+- この Mac が起きていて、同じネットワークにいる必要がある
+- ネットワークの誰でも刷れる。リボンや濃さなどの設定は、この Mac の Evolis Utility からだけ変えられる
+  （ネットワークからの設定の変更は Printer Application が拒む。共有している間は Web の設定画面も止める）
+- iPhone の印刷画面では、用紙サイズは最初から「85.6 × 54mm」になる。選べるのは部数、カラーでプリント、メディアタイプ、プリント品質
+- macOS のファイアウォールがオンでも、「ダウンロードした署名済みソフトウェアを自動的に許可」がオン（既定）なら通る
+- macOS の「プリンタとスキャナ」の「ネットワークでこのプリンタを共有」では、iPhone・iPad には出てこない
+  （macOS は共有するプリンタを AirPrint として知らせない）。こちらはオフのままでよい
+
+2026-10-15 に、iPhone から sample-card.pdf を刷って、Mac から刷ったものと同じカードが出ることを確かめた。
 
 ### v1（PPD のドライバ）から移る
 
@@ -89,6 +109,7 @@ USB の送信処理が失敗したとき（ジョブの途中でプリンタの�
 sudo evolis-setup --remove           # キュー(システム設定で登録した場合は、そこで削除する)
 sudo launchctl bootout system/jp.yukino.evolis-printer-app
 sudo rm -f /Library/LaunchDaemons/jp.yukino.evolis-printer-app.plist /usr/local/bin/evolis-printer-app \
+           "/Library/Application Support/evolis-printer-app.conf" \
            /usr/local/libexec/cups/filter/rastertoevolis /usr/local/bin/evolis-setup /usr/local/bin/evolis-tool \
            /Library/Printers/PPDs/Contents/Resources/EvolisPebble4.ppd.gz /Library/Logs/evolis-printer-app.log
 sudo rm -rf /usr/local/libexec/evolis /usr/local/share/evolis "/Applications/Evolis Utility.app" \
@@ -109,7 +130,8 @@ sudo pkgutil --forget jp.yukino.evolis-pebble4
   本体に残っている設定（リボンの設定、黒・カラー・オーバーレイの濃さ、カラーの明るさ）。テストカードと技術テストカードを刷る
 - **印刷の設定**タブ: macOS から刷るときのリボン、オーバーレイの範囲、黒パネルの処理、濃さ（Printer Application の既定値。
   `evolis-printer-app options` / `modify` で読み書きするので sudo は要らない）。変えた値はすぐ保存され、次に刷るときにプリンタに送られる。
-  テストカードの前などに本体の値もそろえたいときは「プリンタに送る」を押す（`Pr` / `Pc` / `Pl` をその場で送る。カードは使わない）
+  テストカードの前などに本体の値もそろえたいときは「プリンタに送る」を押す（`Pr` / `Pc` / `Pl` をその場で送る。カードは使わない）。
+  「ほかの機器から印刷できるようにする」で、iPhone・iPad・ほかの Mac と共有する
 - **クリーニング**タブ: 時期（`Rlr;r`）、回数、平均・最大の間隔。クリーニングを呼ぶ
 - テストカード、技術テストカード、クリーニングは、確認してから送る
 - **プリントヘッドのキット番号の変更**: ヘッドを交換したら、新しいヘッドの白いラベルにあるキット番号を本体に書く
@@ -594,8 +616,8 @@ v2.0 では、これを標準にした（今の macOS 27 は CUPS 2.3 で、PPD 
 | リボンと濃さ | 独自の属性（`evolis-ribbon`、`evolis-overlay`、`evolis-black-mode`、`evolis-black-density`、`evolis-color-density`、`evolis-color-brightness`、`evolis-overlay-density`。値は PPD と同じ）。印刷ダイアログには出ないので、プリンタの既定値として Evolis Utility（または `evolis-printer-app modify`）で決める |
 | USB | libusb は使わず、Evolis Utility と同じく IOUSBHost で読み書きする（[`usb-device.m`](printer-app/usb-device.m)、`evolis-usb://`） |
 | 変換済みのデータ | `application/vnd.evolis` で送ると、そのままプリンタに送る（`evolis-tool` がテストカードなどのコマンドを送るのに使う） |
-| 動かし方 | root の LaunchDaemon。localhost でだけ待ち受け、DNS-SD もこの Mac にだけ知らせる（`server-hostname=localhost`、`listen-hostname=localhost`、ポート 8630） |
-| 設定画面 | `http://localhost:8630/` でも、PAPPL の Web の設定画面が開ける（英語と日本語。表示名は PPD と同じ） |
+| 動かし方 | root の LaunchDaemon（ポート 8630）。既定では localhost でだけ待ち受け、DNS-SD もこの Mac にだけ知らせる（設定ファイルの `server-hostname=localhost`、`listen-hostname=localhost`）。共有するとこの 2 行を消し、ネットワークで待ち受けて AirPrint として知らせる |
+| 設定画面 | 共有していないときは `http://localhost:8630/` で PAPPL の Web の設定画面も開ける（英語と日本語。表示名は PPD と同じ）。PAPPL 1.4 では、設定画面をネットワークから使えないようにする設定（`web-remote`）が効かないので、共有している間は設定画面を止める（`server-options=no-web-interface`）。IPP での設定の変更は、ネットワークからは PAPPL がもともと拒む（試して確認） |
 
 確かめたこと（2026-10-14、macOS 27.0.1 / Apple Silicon、ファームウェア 1510、YMCKO ハーフパネル R3013）:
 

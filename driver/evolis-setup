@@ -113,8 +113,10 @@ lpadmin -p "$QUEUE" -E -v "$APP_URI" -m everywhere -D "Evolis Pebble 4" -L "USB"
         -o printer-is-shared=false -o printer-error-policy=abort-job
 say "Done. Evolis Pebble 4 appears in System Settings > Printers & Scanners (default ribbon: $RIBBON)." \
     "完了しました。「設定」>「プリンタとスキャナ」に Evolis Pebble 4 が出ます(既定のリボン: $RIBBON)。"
-say "  Ribbon, overlay and densities: http://localhost:8630/ (or Evolis Utility > Print settings)" \
-    "  リボン・オーバーレイ・濃さの設定: http://localhost:8630/(Evolis Utility の「印刷の設定」からも開けます)"
+say "  Ribbon, overlay and densities: Evolis Utility > Print settings" \
+    "  リボン・オーバーレイ・濃さ: Evolis Utility の「印刷の設定」タブで変えます"
+say "  To print from iPhone, iPad or other Macs: turn on sharing there, or run sudo evolis-setup --share" \
+    "  iPhone・iPad・ほかの Mac から刷るとき: 同じタブで共有をオンにするか、sudo evolis-setup --share"
 say "  Remove: sudo evolis-setup --remove --queue $QUEUE" "  削除: sudo evolis-setup --remove --queue $QUEUE"
 # 以前の PPD のキューが残っていれば知らせる(同じプリンタが 2 つ出るので)
 # (lpstat の表示は言語で変わるので、キューごとに URI を見る)

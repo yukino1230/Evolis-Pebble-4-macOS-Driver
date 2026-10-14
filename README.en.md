@@ -25,6 +25,9 @@ print dialog with a half-panel YMCKO ribbon (R3013). The left part (about 36 mm)
 > PPD-based drivers in a future version, so this keeps working after that ([Printer Application](#printer-application-standard-from-v20)).
 > The v1 PPD driver is still included and can be used with `--ppd`.
 
+> **From v2.1, iPhone, iPad and other Macs can print too (AirPrint).** Turn on sharing in Evolis Utility
+> ([Printing from iPhone, iPad and other Macs](#printing-from-iphone-ipad-and-other-macs-from-v21)).
+
 > **Languages:** the print-dialog options, the Evolis Utility app, the command-line tools and the queue messages are in
 > **English and Japanese** and follow the macOS language setting (from v1.2; v1.1 and earlier are Japanese only).
 
@@ -50,6 +53,7 @@ The ribbon and densities do not appear in the print dialog; cards are printed wi
 |---|---|
 | Printer Application (Intel and Apple Silicon) | `/usr/local/libexec/evolis/evolis-printer-app` (also `/usr/local/bin/evolis-printer-app`) |
 | Start-up setting | `/Library/LaunchDaemons/jp.yukino.evolis-printer-app.plist` |
+| Sharing setting | `/Library/Application Support/evolis-printer-app.conf` (rewritten by `evolis-setup --share` / `--no-share`) |
 | Queue setup command | `/usr/local/bin/evolis-setup` |
 | Printer function command | `/usr/local/bin/evolis-tool` (test card, technical test card, cleaning) |
 | Utility app | `/Applications/Evolis Utility.app` (printer status, print settings, test cards, cleaning) |
@@ -65,6 +69,22 @@ Evolis Utility. "EVOLIS Pebble" of kind "USB" is the printer itself seen directl
 The Printer Application runs as root and listens only on this Mac (localhost); other devices on the network cannot see it.
 The printer and its settings are kept in `/private/var/lib/evolis-printer-app.state`, and the log in
 `/Library/Logs/evolis-printer-app.log` (read it with `sudo`).
+
+### Printing from iPhone, iPad and other Macs (from v2.1)
+
+Turn on "Allow printing from other devices" in the Print settings tab of Evolis Utility (it asks for an administrator password), or run
+`sudo evolis-setup --share` (`--no-share` to stop). The Printer Application then advertises itself on the network as an AirPrint printer,
+so "Evolis Pebble 4" can be chosen from Print on iPhone and iPad.
+
+- This Mac must be awake and on the same network
+- Anyone on the network can print. Settings such as the ribbon and densities can only be changed from Evolis Utility on this Mac
+  (the Printer Application refuses settings changes from the network, and the web settings page is off while sharing)
+- On iPhone the paper size is "85.6 × 54mm" from the start; the options are copies, print in color, media type and print quality
+- With the macOS firewall on, it still gets through as long as "Automatically allow downloaded signed software" is on (the default)
+- "Share this printer on the network" in macOS Printers & Scanners does not make it appear on iPhone or iPad (macOS does not advertise
+  shared printers as AirPrint); leave it off
+
+Tested on 2026-10-15: sample-card.pdf printed from an iPhone came out the same as from the Mac.
 
 ### Moving from v1 (PPD driver)
 
@@ -94,6 +114,7 @@ the whole queue (`printer-error-policy=abort-job`). Jobs stopped by the driver (
 sudo evolis-setup --remove           # the queue (if you added it in System Settings, delete it there instead)
 sudo launchctl bootout system/jp.yukino.evolis-printer-app
 sudo rm -f /Library/LaunchDaemons/jp.yukino.evolis-printer-app.plist /usr/local/bin/evolis-printer-app \
+           "/Library/Application Support/evolis-printer-app.conf" \
            /usr/local/libexec/cups/filter/rastertoevolis /usr/local/bin/evolis-setup /usr/local/bin/evolis-tool \
            /Library/Printers/PPDs/Contents/Resources/EvolisPebble4.ppd.gz /Library/Logs/evolis-printer-app.log
 sudo rm -rf /usr/local/libexec/evolis /usr/local/share/evolis "/Applications/Evolis Utility.app" \
@@ -131,7 +152,8 @@ cannot be opened from there.
 - **Print settings** tab: the ribbon, overlay area, black panel rendering and densities used when printing from macOS (the Printer
   Application's defaults, read and written with `evolis-printer-app options` / `modify`, so no sudo is needed). Changes are saved right
   away and sent to the printer with the next print. To update the printer itself now (for example before a test card), press
-  Send to printer (sends `Pr` / `Pc` / `Pl` right away; no card is used)
+  Send to printer (sends `Pr` / `Pc` / `Pl` right away; no card is used). "Allow printing from other devices" shares the printer with
+  iPhone, iPad and other Macs
 - **Cleaning** tab: whether cleaning is due (`Rlr;r`), number of cleanings, average and maximum interval. Runs a cleaning
 - Test cards and cleaning each ask for confirmation
 - **Changing the print head kit number**: after replacing the print head, write the kit number from the white label of the new head
@@ -621,8 +643,8 @@ v2.0 makes this the standard setup (macOS 27 ships CUPS 2.3, and PPD drivers sti
 | Ribbon and densities | Vendor attributes (`evolis-ribbon`, `evolis-overlay`, `evolis-black-mode`, `evolis-black-density`, `evolis-color-density`, `evolis-color-brightness`, `evolis-overlay-density`; same values as the PPD). They do not appear in the print dialog, so they are set as printer defaults in Evolis Utility (or with `evolis-printer-app modify`) |
 | USB | No libusb; reads and writes with IOUSBHost like Evolis Utility ([`usb-device.m`](printer-app/usb-device.m), `evolis-usb://`) |
 | Pre-built data | Data sent as `application/vnd.evolis` goes to the printer as is (`evolis-tool` uses it to send the test card and other commands) |
-| How it runs | A root LaunchDaemon. Listens only on localhost and advertises over DNS-SD to this Mac only (`server-hostname=localhost`, `listen-hostname=localhost`, port 8630) |
-| Web settings | PAPPL's web settings page is also available at `http://localhost:8630/` (English and Japanese, with the same labels as the PPD) |
+| How it runs | A root LaunchDaemon (port 8630). By default it listens only on localhost and advertises over DNS-SD to this Mac only (`server-hostname=localhost` and `listen-hostname=localhost` in the config file). Sharing removes these two lines, so it listens on the network and advertises as AirPrint |
+| Web settings | When not sharing, PAPPL's web settings page is also available at `http://localhost:8630/` (English and Japanese, with the same labels as the PPD). PAPPL 1.4 does not enforce its setting that keeps the settings page off the network (`web-remote`), so the page is turned off while sharing (`server-options=no-web-interface`). PAPPL already refuses IPP settings changes from the network (tested) |
 
 Verified (2026-10-14, macOS 27.0.1 on Apple Silicon, firmware 1510, half-panel YMCKO R3013):
 
