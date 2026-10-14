@@ -1,0 +1,75 @@
+diff -ru a/pappl/mainloop-support.c b/pappl/mainloop-support.c
+--- a/pappl/mainloop-support.c	2026-08-21 07:14:41
++++ b/pappl/mainloop-support.c	2026-10-15 00:54:30
+@@ -450,7 +450,9 @@
+   }
+ #endif // !_WIN32
+ 
+-  if (!http && auto_start)
++  // Evolis: サーバにつなげないとき、自分でサーバを立ち上げない(Printer Application は LaunchDaemon で動かすので、
++  // 立ち上がると同じ状態のファイルを使うサーバが 2 つになる)
++  if (!http && auto_start && getenv("EVOLIS_ALLOW_PRIVATE_SERVER"))
+   {
+     // Nope, start it now...
+     int		tries;			// Number of retries
+diff -ru a/pappl/system.c b/pappl/system.c
+--- a/pappl/system.c	2026-08-21 07:14:41
++++ b/pappl/system.c	2026-10-15 00:54:30
+@@ -9,6 +9,8 @@
+ //
+ 
+ #include "pappl-private.h"
++#include <unistd.h>
++#include <uuid/uuid.h>
+ #include "resource-private.h"
+ #include "device-private.h"
+ 
+@@ -356,6 +358,36 @@
+ // printers so the UUIDs are stable.
+ //
+ 
++//
++// Evolis: プリンタとシステムの UUID を、ホスト名ではなくこの Mac の ID(gethostuuid)から作る。
++// ホスト名は共有するかどうかで localhost と Mac の名前に変わり、そのたびに UUID が変わると、
++// Bonjour で追加したキュー(dnssd://...?uuid=...)がプリンタを見失う。Mac ごとには違う値になる。
++//
++
++static const char *
++evolis_host_id(pappl_system_t *system)
++{
++  static char	id[64] = "";		// Host ID string
++  uuid_t	uuid;			// Host UUID
++  struct timespec wait = { 1, 0 };	// Timeout
++
++  if (!id[0])
++  {
++    if (!gethostuuid(uuid, &wait))
++    {
++      uuid_string_t str;		// UUID string
++
++      uuid_unparse_lower(uuid, str);
++      papplCopyString(id, str, sizeof(id));
++    }
++    else
++      papplCopyString(id, system->hostname, sizeof(id));
++  }
++
++  return (id);
++}
++
++
+ char *					// I - UUID string
+ _papplSystemMakeUUID(
+     pappl_system_t *system,		// I - System
+@@ -377,9 +409,9 @@
+   else if (printer_name && job_id)
+     snprintf(data, sizeof(data), "_PAPPL_JOB_:%s:%d:%s:%d:%08x", system->hostname, system->port, printer_name, job_id, papplGetRand());
+   else if (printer_name)
+-    snprintf(data, sizeof(data), "_PAPPL_PRINTER_:%s:%d:%s", system->hostname, system->port, printer_name);
++    snprintf(data, sizeof(data), "_PAPPL_PRINTER_:%s:%d:%s", evolis_host_id(system), system->port, printer_name);
+   else
+-    snprintf(data, sizeof(data), "_PAPPL_SYSTEM_:%s:%d", system->hostname, system->port);
++    snprintf(data, sizeof(data), "_PAPPL_SYSTEM_:%s:%d", evolis_host_id(system), system->port);
+ 
+   cupsHashData("sha2-256", (unsigned char *)data, strlen(data), sha256, sizeof(sha256));
+ 

@@ -199,7 +199,7 @@ sudo pkgutil --forget jp.yukino.evolis-pebble4
 Requires the Xcode command line tools (`xcode-select --install`) and python3.
 
 ```bash
-./driver/build-pkg.sh 2.1.1            # produces build/pkg/evolis-pebble4-2.1.1.pkg
+./driver/build-pkg.sh 2.1.2            # produces build/pkg/evolis-pebble4-2.1.2.pkg
 sudo driver/install.sh --ribbon k      # build and install only the PPD driver in place, without a pkg (for development)
 ```
 

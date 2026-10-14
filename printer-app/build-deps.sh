@@ -10,6 +10,7 @@
 # - LibreSSL: PAPPL が要る TLS(ISC / OpenSSL ライセンス)。macOS には開発用のものが無いので自分で入れる
 # - USB は libusb を使わず、IOUSBHost で自前の仕組みを PAPPL に登録する(usb-device.m)。
 #   JPEG / PNG は使わない(IPP Everywhere / AirPrint ではラスタで届く)
+# - PAPPL には printer-app/pappl.patch の変更を当てる
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 DEPS="$HERE/../build/deps"
@@ -50,12 +51,10 @@ for arch in arm64 x86_64; do
     echo "==> PAPPL $PAPPL_VER ($arch)"
     B="$DEPS/build-$arch/pappl"; rm -rf "$B"; mkdir -p "$B"
     tar xzf "$SRC/pappl-$PAPPL_VER.tar.gz" -C "$B" --strip-components 1
-    # サブコマンド(options / modify など)がサーバにつなげないとき、自分でサーバを立ち上げないようにする。
-    # このドライバでは Printer Application は LaunchDaemon で動かすので、立ち上がると同じ状態のファイルを
-    # 使うサーバが 2 つになってしまう(つながらないときは、エラーで終わればよい)
-    sed -i '' 's/if (!http \&\& auto_start)/if (!http \&\& auto_start \&\& getenv("EVOLIS_ALLOW_PRIVATE_SERVER"))/' \
-        "$B/pappl/mainloop-support.c"
-    grep -q 'EVOLIS_ALLOW_PRIVATE_SERVER' "$B/pappl/mainloop-support.c" || { echo "PAPPL に変更を当てられません" >&2; exit 1; }
+    # このドライバ用の変更(printer-app/pappl.patch):
+    # - サブコマンドがサーバにつなげないとき、自分でサーバを立ち上げない(LaunchDaemon とぶつかる)
+    # - プリンタの UUID をホスト名ではなくこの Mac の ID から作る(共有の切り替えで UUID が変わらないように)
+    patch -s -p1 -d "$B" < "$HERE/pappl.patch"
     (cd "$B" && PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig" \
        ./configure --host="$HOST" --prefix="$PREFIX" --disable-shared --with-tls=libressl \
                    --with-dnssd=mdnsresponder --disable-libjpeg --disable-libpng --disable-libusb \
