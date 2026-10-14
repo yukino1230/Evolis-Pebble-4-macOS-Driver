@@ -19,6 +19,7 @@
 #include <unistd.h>
 #include "../driver/evolis_card.h"
 #include "usb-device.h"
+#include "evolis-strings.h"     /* printer-app/mkstrings.py が作る */
 
 #ifndef EVOLIS_VERSION
 #  define EVOLIS_VERSION "2.0"
@@ -78,11 +79,25 @@ static bool rstartjob(pappl_job_t *job, pappl_pr_options_t *options, pappl_devic
     evolis_job_t *ej = calloc(1, sizeof *ej);
     if (!ej) return false;
     evolis_default_options(&ej->opt);
-    /* ジョブの値が無い属性には、PAPPL がプリンタの既定値(xxx-default)を入れて渡してくる */
+    /* ジョブに値があればそれを、無ければプリンタの既定値(xxx-default、Web の設定画面や modify で決めたもの)を使う。
+       macOS の印刷ダイアログからのジョブには独自属性が付かないので、ふつうは既定値になる */
+    ipp_t *defaults = papplPrinterGetDriverAttributes(papplJobGetPrinter(job));
     for (int i = 0; i < NVENDOR; i++) {
+        char name[128], num[16];
         const char *v = cupsGetOption(VENDOR[i].attr, options->num_vendor, options->vendor);
+        ipp_attribute_t *a;
+        snprintf(name, sizeof name, "%s-default", VENDOR[i].attr);
+        if (!v && (a = ippFindAttribute(defaults, name, IPP_TAG_ZERO)) != NULL) {
+            if (ippGetValueTag(a) == IPP_TAG_INTEGER) {
+                snprintf(num, sizeof num, "%d", ippGetInteger(a, 0));
+                v = num;
+            } else {
+                v = ippGetString(a, 0, NULL);
+            }
+        }
         evolis_set_option(&ej->opt, VENDOR[i].key, v ? v : VENDOR[i].def);
     }
+    ippDelete(defaults);
     ej->out = funopen(device, NULL, devwrite, NULL, NULL);
     if (!ej->out) { free(ej); return false; }
     papplJobSetData(job, ej);
@@ -174,7 +189,14 @@ static bool printfile(pappl_job_t *job, pappl_pr_options_t *options, pappl_devic
 
 static bool driver_cb(pappl_system_t *system, const char *driver_name, const char *device_uri,
                       const char *device_id, pappl_pr_driver_data_t *d, ipp_t **attrs, void *data) {
+    static bool strings_added = false;
     (void)device_uri; (void)device_id; (void)data;
+    /* Web の設定画面の表示名(リボンなど)。最初の 1 回だけ足す */
+    if (!strings_added) {
+        papplSystemAddStringsData(system, "/evolis-en.strings", "en", STRINGS_EN);
+        papplSystemAddStringsData(system, "/evolis-ja.strings", "ja", STRINGS_JA);
+        strings_added = true;
+    }
     if (strcmp(driver_name, DRIVER_NAME)) {
         papplLog(system, PAPPL_LOGLEVEL_ERROR, "Unknown driver '%s'.", driver_name);
         return false;

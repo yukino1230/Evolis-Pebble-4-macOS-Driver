@@ -37,7 +37,7 @@ static bool usb_list(pappl_device_cb_t cb, void *data, pappl_deverror_cb_t err_c
     io_service_t s = find_interface();
     if (!s) return false;
     IOObjectRelease(s);
-    return cb("Evolis Pebble 4 (USB)", EVOLIS_USB_URI, EVOLIS_DEVICE_ID, data);
+    return cb("Evolis Pebble 4", EVOLIS_USB_URI, EVOLIS_DEVICE_ID, data);
 }
 
 static bool usb_open(pappl_device_t *device, const char *uri, const char *name) {

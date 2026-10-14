@@ -61,6 +61,14 @@ urf-gray      urfgray.ras  image/urf        k      full      gray urf-gray
 blank-page    blank2.ras   image/pwg-raster ymckos full      gray blank-page
 CASES
 
+# macOS からのジョブには独自属性が付かないので、プリンタの既定値(Web の設定画面や modify で決めたもの)で刷る
+"$APP" modify -d Test -o evolis-ribbon=ymckos -o evolis-overlay=chipiso
+before="$(finished)"
+ipptool -q -f "$ROOT/build/tests/color.ras" -d filetype=image/pwg-raster "$U" print-job.test 2>/dev/null || true
+for _ in $(seq 1 60); do [ "$(finished)" -gt "$before" ] && break; sleep 0.5; done
+out="$(ls -t "$WORK/out"/*.prn | head -1)"
+check printer-defaults "$(shasum -a 256 < "$out" | cut -c1-16)" "$(expected ymckos-chip)"
+
 # 用紙がカードでないジョブは刷らずに止める(出力が無い。PAPPL が先に開くので空のファイルは残る)
 check a4 "$(send a4 a4.ras image/pwg-raster k full gray)" none
 # 印刷ダイアログと同じ形(用紙を media-col の大きさで指定)のジョブを受け付けるか(刷らない)
