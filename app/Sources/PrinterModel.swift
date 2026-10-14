@@ -17,7 +17,8 @@ final class PrinterModel: ObservableObject {
     @Published var message: String?
     @Published var working = false
 
-    func refresh() {
+    /// 状態を読み直す。done は読み終わったあとに出すメッセージ
+    func refresh(done: String? = nil) {
         run(label: nil) { p in
             func q(_ c: String) throws -> String { try p.query(c) }
             let printer = [
@@ -50,6 +51,7 @@ final class PrinterModel: ObservableObject {
                 model.settings = settings
                 model.cleaning = cleaning
                 model.needsCleaning = due != "OK"
+                model.message = done
             }
         }
     }
@@ -57,6 +59,29 @@ final class PrinterModel: ObservableObject {
     func testCard()      { send("St", label: L("Printing a test card…")) }
     func technicalCard() { send("Stt", label: L("Printing a technical test card…")) }
     func clean()         { send("Scp", label: L("Cleaning…")) }
+
+    /// 「印刷の設定」の値(Printer Application の既定値)をプリンタ本体にも書く。
+    /// 刷るときに Printer Application が送るのと同じコマンド(driver/evolis_card.c の evolis_job_start)
+    func sendSettings(_ v: [String: String]) {
+        let ribbon = v["evolis-ribbon"] ?? "k"
+        let color = ["ymcko", "ymckos"].contains(ribbon)
+        let overlay = color || ribbon == "ko"
+        func n(_ key: String) -> Int { Int(v[key] ?? "") ?? 10 }
+        var commands = ["Pr;\(ribbon)", "Pc;k;=;\(n("evolis-black-density"))"]
+        if color {
+            commands += ["y", "m", "c"].map { "Pc;\($0);=;\(n("evolis-color-density"))" }
+            // 本体の Pl は大きいほど暗いので、明るさを逆にして送る
+            commands.append("Pl;a;=;\(20 - n("evolis-color-brightness"))")
+        }
+        if overlay { commands.append("Pc;o;=;\(n("evolis-overlay-density"))") }
+        let send = commands
+        run(label: L("Sending the settings to the printer…")) { p in
+            for c in send { _ = try p.query(c) }
+            return { _ in }
+        } then: { [weak self] in
+            self?.refresh(done: L("Sent the settings to the printer."))
+        }
+    }
 
     /// ヘッドを交換したあと、新しいヘッドのラベルにあるキット番号を本体に書く(Pkn)。
     /// 本体は番号の頭 3 桁(抵抗値 x 10)を印刷の制御に使う

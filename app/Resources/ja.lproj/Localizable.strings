@@ -19,6 +19,7 @@
 "Blue" = "青";
 "Cancel" = "キャンセル";
 "Cards inserted" = "入れたカードの数";
+"Changes are saved right away and sent to the printer with the next print. To update the printer now (for example before a test card), use Send to printer." = "変えた設定はすぐ保存され、次に刷るときにプリンタに送られます。テストカードの前など、今すぐ本体の値も変えたいときは「プリンタに送る」を押してください。";
 "Change…" = "変更…";
 "Clean the printer (%@)" = "クリーニングしてください（%@）";
 "Clean the printer?" = "クリーニングしますか？";
@@ -69,6 +70,9 @@
 "Ribbon" = "リボン";
 "Scratch-off (monochrome)" = "スクラッチ (モノクロ)";
 "Scratch-off" = "スクラッチ";
+"Send to printer" = "プリンタに送る";
+"Sending the settings to the printer…" = "設定をプリンタに送っています…";
+"Sent the settings to the printer." = "設定をプリンタに送りました。";
 "Set" = "設定する";
 "Setting the print head kit number…" = "プリントヘッドのキット番号を設定しています…";
 "Settings stored in the printer" = "設定（本体に残っている値）";

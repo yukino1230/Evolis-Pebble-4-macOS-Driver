@@ -92,7 +92,9 @@ struct ContentView: View {
                 case .cleaning:
                     Button("Clean…") { confirm = .clean }
                 case .printing:
-                    EmptyView()
+                    // 変えた設定は刷るときに送られる。テストカードの前などに、本体の値も揃えたいときに使う
+                    Button("Send to printer") { model.sendSettings(settings.values) }
+                        .disabled(!settings.available)
                 }
                 Spacer()
                 Button("Refresh") { model.refresh(); settings.load() }
@@ -133,6 +135,7 @@ struct ContentView: View {
         } footer: {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Used when printing from macOS. Match the ribbon to the one in the printer. Densities: 0–20, standard 10 (brightness: higher is lighter).")
+                Text("Changes are saved right away and sent to the printer with the next print. To update the printer now (for example before a test card), use Send to printer.")
                 if let error = settings.error { Text(error).foregroundStyle(.red) }
             }
             .font(.footnote).foregroundStyle(.secondary)
