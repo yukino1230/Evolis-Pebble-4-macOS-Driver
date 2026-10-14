@@ -1,5 +1,5 @@
 # 印刷ダイアログと同じ形(用紙を media-col の大きさで指定)のジョブを受け付けるかを確かめる。カードは刷らない。
-# tests/ipp.sh から使う
+# tests/printer-app.sh から使う
 {
   NAME "Validate-Job with media-col (like the macOS print dialog)"
   OPERATION Validate-Job

@@ -20,6 +20,11 @@ not been tested on a printer. The Pebble 4 prints on one side only.
 *Scan of the sample card ([samples/sample-card.pdf](samples/sample-card.pdf)) printed from the v1.1 print dialog with a
 half-panel YMCKO ribbon (R3013). The left part (about 36 mm) is in color; the right part is printed as a halftone on the black panel.*
 
+> **From v2.0, the standard setup is a Printer Application.** macOS sees the printer as a driverless printer (IPP Everywhere, the
+> same idea as AirPrint), and the ribbon and densities are set in the Print settings tab of Evolis Utility. CUPS plans to remove
+> PPD-based drivers in a future version, so this keeps working after that ([Printer Application](#printer-application-standard-from-v20)).
+> The v1 PPD driver is still included and can be used with `--ppd`.
+
 > **Languages:** the print-dialog options, the Evolis Utility app, the command-line tools and the queue messages are in
 > **English and Japanese** and follow the macOS language setting (from v1.2; v1.1 and earlier are Japanese only).
 
@@ -27,27 +32,55 @@ half-panel YMCKO ribbon (R3013). The left part (about 36 mm) is in color; the ri
 
 Download `evolis-pebble4-<version>.pkg` from
 [Releases](https://github.com/yukino1230/Evolis-Pebble-4-macOS-Driver/releases/latest) and double-click it
-(it is signed with a Developer ID and notarized by Apple). Then connect the printer over USB, turn it on, and create the queue:
+(it is signed with a Developer ID and notarized by Apple). Installing it starts the Printer Application (`evolis-printer-app`),
+which also starts automatically when the Mac starts up. Then connect the printer over USB, turn it on, and create the queue:
 
 ```bash
 sudo evolis-setup --ribbon k
 ```
 
 Pass the ribbon that is loaded with `--ribbon` (`k` black / `ymckos` half-panel color / `ymcko` full-panel color, etc.;
-see [Ribbon types](#ribbon-types-pr)). When you change the ribbon, run
-`sudo lpadmin -p Evolis_Pebble_4 -o EvolisRibbon=<type>`.
+see [Ribbon types](#ribbon-types-pr)). When you change the ribbon, change it in the Print settings tab of Evolis Utility (no sudo needed).
+
+In the print dialog, choose the paper size "85.6x54mm.Borderless" (Preview opens with "Other", so choose it every time).
+The ribbon and densities do not appear in the print dialog; cards are printed with the values set in Evolis Utility.
 
 | Installed | Location |
 |---|---|
-| CUPS filter (Intel and Apple Silicon) | `/usr/local/libexec/cups/filter/rastertoevolis` |
-| PPD | `/Library/Printers/PPDs/Contents/Resources/EvolisPebble4.ppd.gz`, `/usr/local/share/evolis/Pebble4.ppd` |
+| Printer Application (Intel and Apple Silicon) | `/usr/local/libexec/evolis/evolis-printer-app` (also `/usr/local/bin/evolis-printer-app`) |
+| Start-up setting | `/Library/LaunchDaemons/jp.yukino.evolis-printer-app.plist` |
 | Queue setup command | `/usr/local/bin/evolis-setup` |
 | Printer function command | `/usr/local/bin/evolis-tool` (test card, technical test card, cleaning) |
-| Utility app | `/Applications/Evolis Utility.app` (printer status, cleaning due, test cards, cleaning) |
+| Utility app | `/Applications/Evolis Utility.app` (printer status, print settings, test cards, cleaning) |
+| CUPS filter and PPD (used with `--ppd`) | `/usr/local/libexec/cups/filter/rastertoevolis`, `/Library/Printers/PPDs/Contents/Resources/EvolisPebble4.ppd.gz`, `/usr/local/share/evolis/Pebble4.ppd` |
+| Licenses of the bundled libraries | `/usr/local/share/evolis/licenses` |
 
-**You can also add the printer without the Terminal.** The PPD carries the printer's device ID (`MFG:EVOLIS;MDL:Pebble`), so in
-System Settings → Printers & Scanners → Add Printer, choosing "EVOLIS Pebble" (kind: USB) selects the
-"Evolis Pebble 4" driver automatically (confirmed). The queue is then named `EVOLIS_Pebble`. Two things differ from `evolis-setup`:
+The Printer Application runs as root and listens only on this Mac (localhost); other devices on the network cannot see it.
+The printer and its settings are kept in `/private/var/lib/evolis-printer-app.state`, and the log in
+`/Library/Logs/evolis-printer-app.log` (read it with `sudo`).
+
+### Moving from v1 (PPD driver)
+
+After installing the v2.0 pkg, run `evolis-setup` with the name of your current queue; that queue switches to the Printer Application.
+
+```bash
+sudo evolis-setup --ribbon ymckos --queue EVOLIS_Pebble     # see the queue name in Printers & Scanners
+```
+
+Without `--queue`, a new queue named `Evolis_Pebble_4` is created. The old queue stays (`evolis-setup` tells you about it);
+remove it with `sudo evolis-setup --remove --queue <name>` if you no longer need it.
+
+### Using the PPD driver (v1 setup)
+
+```bash
+sudo evolis-setup --ppd --ribbon k
+```
+
+The ribbon and densities can then be chosen in the print dialog ([Print dialog options](#print-dialog-options)). When you change the
+ribbon, change the default with `sudo lpadmin -p Evolis_Pebble_4 -o EvolisRibbon=<type>`.
+The PPD carries the printer's device ID (`MFG:EVOLIS;MDL:Pebble`), so in System Settings → Printers & Scanners → Add Printer,
+choosing "EVOLIS Pebble" (kind: USB) also selects the "Evolis Pebble 4" driver automatically (the queue is named `EVOLIS_Pebble`).
+Two things differ from `evolis-setup`:
 
 - If the USB backend fails (for example, the printer is switched off in the middle of a job), the whole queue is paused until
   you press Resume in the queue window (CUPS default `printer-error-policy=stop-printer`). To cancel just that job instead,
@@ -55,19 +88,23 @@ System Settings → Printers & Scanners → Add Printer, choosing "EVOLIS Pebble
   wrong paper size, only stop that job regardless of this setting.
 - The default ribbon is black (`k`). For a color ribbon run `sudo lpadmin -p EVOLIS_Pebble -o EvolisRibbon=ymckos` or pick it in the print dialog.
 
-Uninstall:
+### Uninstall
 
 ```bash
-sudo evolis-setup --remove           # if you added the printer in System Settings, delete it there instead
-sudo rm -f /usr/local/libexec/cups/filter/rastertoevolis /usr/local/bin/evolis-setup /usr/local/bin/evolis-tool \
-           /Library/Printers/PPDs/Contents/Resources/EvolisPebble4.ppd.gz
-sudo rm -rf /usr/local/share/evolis "/Applications/Evolis Utility.app"
+sudo evolis-setup --remove           # the queue (if you added it in System Settings, delete it there instead)
+sudo launchctl bootout system/jp.yukino.evolis-printer-app
+sudo rm -f /Library/LaunchDaemons/jp.yukino.evolis-printer-app.plist /usr/local/bin/evolis-printer-app \
+           /usr/local/libexec/cups/filter/rastertoevolis /usr/local/bin/evolis-setup /usr/local/bin/evolis-tool \
+           /Library/Printers/PPDs/Contents/Resources/EvolisPebble4.ppd.gz /Library/Logs/evolis-printer-app.log
+sudo rm -rf /usr/local/libexec/evolis /usr/local/share/evolis "/Applications/Evolis Utility.app" \
+            /private/var/lib/evolis-printer-app.state /private/var/spool/evolis-printer-app
 sudo pkgutil --forget jp.yukino.evolis-pebble4
 ```
 
 ### Print dialog options
 
-The options appear under "Printer Options" in the print dialog.
+With the PPD driver (`--ppd`), the options appear under "Printer Options" in the print dialog. The Printer Application has the same
+settings (same values) in the Print settings tab of Evolis Utility.
 
 | Option | Values |
 |---|---|
@@ -82,40 +119,52 @@ The options appear under "Printer Options" in the print dialog.
 
 ### Evolis Utility
 
-An app to see the printer's status and call its built-in functions. The pkg installs it in `/Applications`; start it from the
-Applications folder, Launchpad or Spotlight. The PPD also sets `*APPrinterUtilityPath`, but current macOS (27) has no
-"Open Printer Utility" button in Printers & Scanners ("Options & Supplies" only has General and Supply Levels), so it cannot be opened from there.
+An app to see the printer's status, change the print settings and call the printer's built-in functions. The pkg installs it in
+`/Applications`; start it from the Applications folder, Launchpad or Spotlight. The PPD also sets `*APPrinterUtilityPath`, but current
+macOS (27) has no "Open Printer Utility" button in Printers & Scanners ("Options & Supplies" only has General and Supply Levels), so it
+cannot be opened from there.
 
 <img src="images/utility-en.png" alt="Evolis Utility window" width="600">
 
-- **Printer**: model, firmware, number of cards inserted, number of panels printed, print head kit number (`Rkn`)
-- **Settings stored in the printer**: ribbon type, black / color / overlay density, color brightness
-- **Cleaning**: whether cleaning is due (`Rlr;r`), number of cleanings, average and maximum interval
-- **Buttons**: test card, technical test card, cleaning (each asks for confirmation)
+- **Printer** tab: model, firmware, number of cards inserted, number of panels printed, print head kit number (`Rkn`), and the settings
+  stored in the printer (ribbon type, black / color / overlay density, color brightness). Prints a test card or technical test card
+- **Print settings** tab: the ribbon, overlay area, black panel rendering and densities used when printing from macOS (the Printer
+  Application's defaults, read and written with `evolis-printer-app options` / `modify`, so no sudo is needed). Changes are saved right
+  away and sent to the printer with the next print. To update the printer itself now (for example before a test card), press
+  Send to printer (sends `Pr` / `Pc` / `Pl` right away; no card is used)
+- **Cleaning** tab: whether cleaning is due (`Rlr;r`), number of cleanings, average and maximum interval. Runs a cleaning
+- Test cards and cleaning each ask for confirmation
 - **Changing the print head kit number**: after replacing the print head, write the kit number from the white label of the new head
   to the printer (`Pkn;<number>`, step 3 of "Replacing the print head" in the user guide; on Windows it is sent from the official
   driver's printer dialog). A wrong number makes the printer print incorrectly, so the app asks for it twice, sends it only when both
   match, and reads it back with `Rkn`. Clean the printer before printing again. The kit number contains the head's serial number,
   so hide it in screenshots you share
 
-It talks to the printer over USB directly with macOS's IOUSBHost (no libusb or Python needed). While a job is printing, CUPS
-holds the printer and the app shows it as busy. Source in [`app/`](app/), built with `app/build-app.sh`.
+It talks to the printer over USB directly with macOS's IOUSBHost (no libusb or Python needed). While a job is printing, the Printer
+Application (or CUPS) holds the printer and the app shows it as busy. Source in [`app/`](app/), built with `app/build-app.sh`.
 
 ### Building from source
 
 Requires the Xcode command line tools (`xcode-select --install`) and python3.
 
 ```bash
-./driver/build-pkg.sh 1.2              # produces build/pkg/evolis-pebble4-1.2.pkg
-sudo driver/install.sh --ribbon k      # build and install in place without a pkg (for development)
+./driver/build-pkg.sh 2.0              # produces build/pkg/evolis-pebble4-2.0.pkg
+sudo driver/install.sh --ribbon k      # build and install only the PPD driver in place, without a pkg (for development)
 ```
+
+The Printer Application statically links [PAPPL](https://www.msweet.org/pappl/) 1.4.12 and [LibreSSL](https://www.libressl.org/) 4.3.3.
+On the first run, `build-pkg.sh` calls `printer-app/build-deps.sh`, which downloads both (checking their SHA-256) and builds them from
+source (about two minutes). To build only the Printer Application, use `printer-app/build.sh`.
 
 `build-pkg.sh` signs automatically when a Developer ID certificate is available (otherwise the pkg is unsigned).
 Set `EVOLIS_NOTARY=<notarytool profile name>` to notarize as well.
 
-After changing the filter, run `tests/run.sh` to check that what gets printed has not changed (it compares the bytes sent to the
-printer for 9 test rasters and 24 option combinations). When you change the output on purpose, record it again with `tests/run.sh --update`.
-`tests/ipp.sh` checks that the Printer Application prototype (see "When PPDs stop working" below) gives the same output.
+After changing anything that affects printing, check with the tests that what gets printed has not changed (no printer needed):
+
+- `tests/run.sh`: the CUPS filter. Compares the bytes sent to the printer for 9 test rasters and 24 option combinations.
+  When you change the output on purpose, record it again with `tests/run.sh --update`
+- `tests/printer-app.sh`: the Printer Application. Creates a printer that writes to files, sends jobs over IPP, and checks that 16 cases
+  match the CUPS filter byte for byte, that the printer defaults are used, and that jobs shaped like the print dialog's are accepted
 
 ## Background (research as of 2026-10-13)
 
@@ -356,6 +405,11 @@ the value set with `Pr`, and A5013 describes no automatic detection. Other ribbo
 **When you change the ribbon, set the driver's ribbon to match.** A mismatch can jam the card or break the ribbon (with the
 half-panel R3013 and `ymcko`, the overlay ribbon stuck to the card and broke when peeled off). Ways to switch:
 
+- **Printer Application** (standard in v2.0): choose the ribbon in the Print settings tab of Evolis Utility.
+  From the Terminal: `evolis-printer-app modify -d "Evolis Pebble 4" -o evolis-ribbon=ymckos`
+
+With the PPD driver (`--ppd`):
+
 - **Print dialog presets** (recommended): choose the ribbon, then Presets → Save Current Settings as Preset, e.g. "Color (half
   panel)" and "White". Selecting a preset then switches the ribbon
 - **Change the queue default** (no reinstall needed):
@@ -366,7 +420,8 @@ half-panel R3013 and `ymcko`, the overlay ribbon stuck to the card and broke whe
 
 ### Paper size in the print dialog
 
-**When printing a PDF from Preview, the print dialog opens with the paper size "Other (210 x 297 mm)". Choose "CR80 card" every time.**
+**When printing a PDF from Preview, the print dialog opens with the paper size "Other (210 x 297 mm)". Choose "CR80 card"
+("85.6x54mm.Borderless" with the Printer Application) every time.**
 
 **In Pages and Word, choose printer "Evolis Pebble 4" and paper "CR80 card" in the document's Page Setup**
 (neither print dialog has a paper size field; the document's page setup is used. Confirmed for both).
@@ -520,9 +575,11 @@ The black halftone correction was measured at 10, so changing the black density 
 Printing the sample card with black 14 and color 14 (R3013): colors such as skin and blue get one step deeper; black text gets
 heavier and small text (such as `NAME`) starts to merge. Afterwards `Rc;a` was `14 14 14 14 10 10 10` — the values stayed in the printer.
 
-## CUPS driver
+## How the driver works
 
-[`driver/`](driver/) contains the CUPS filter and PPD used from the print dialog. It is built the same way as the
+### CUPS filter and PPD
+
+[`driver/`](driver/) contains the CUPS filter and PPD used from the print dialog (the v1 design; in v2.0 used with `--ppd`). It is built the same way as the
 [NEC MultiImpact 700XX driver](https://github.com/yukino1230/multiimpact-700xx-macos-driver): PDF → raster is left to macOS's
 `cgpdftoraster`, and only raster → `Db` is written in C. It depends on neither libcups nor Ghostscript.
 
@@ -533,7 +590,7 @@ heavier and small text (such as `NAME`) starts to merge. Afterwards `Rc;a` was `
 | One page | one card (`Ss`…`Se` per page). Two copies, and a two-page document with different pages, both printed two cards correctly |
 | Blank / wrong size check | Blank pages are not printed. If the whole job is blank, or a page is not card-sized (85.6 × 54 mm ±2 mm), the job is stopped with the reason shown in the queue |
 | Placement | The 1011 × 638-dot raster is centered in the printer's 1016 × 648. Portrait pages are rotated to landscape |
-| Ribbon | See the table above. Set the default with `evolis-setup --ribbon` (or `install.sh --ribbon`) |
+| Ribbon | See the table above. Set the default with `evolis-setup --ribbon` (or `install.sh --ribbon`), as with the Printer Application |
 | Density / brightness | Black (single-color ribbon) density, color density, overlay density (`Pc`) and color brightness (`Pl`), 0–20 (standard 10). Sent with every job |
 | Black panel rendering | Gray (halftone, default) / line art (black or white at half brightness). Applies to black and single-color ribbons and to the right part with half-panel ribbons |
 | Overlay | Full (default) / none / avoid IC chip (ISO 7816) / avoid magnetic stripe (ISO 7811, for the back). Only for ribbons with an overlay panel (YMCKO, KO) |
@@ -543,63 +600,38 @@ See [Installation](#installation) to install it.
 A test card PDF was run through `cupsfilter` → `rastertoevolis`, and the output bitmap was turned back into an image to check
 orientation and position against the original. Cards were then printed from the real print dialog (macOS 27.0.1 / Apple Silicon, USB).
 
-### When PPDs stop working
+The way cards are printed (the table above) is the same with the Printer Application. The code that builds the printer commands lives in
+[`driver/evolis_card.c`](driver/evolis_card.c) (the core), used by both the CUPS filter ([`driver/rastertoevolis.c`](driver/rastertoevolis.c))
+and the Printer Application. The CUPS filter reads CUPS raster v2/v3, PWG raster and Apple raster (URF).
+
+### Printer Application (standard from v2.0)
 
 Printer drivers that use CUPS PPDs are deprecated and planned for removal in a future CUPS (`lpadmin` prints a warning when the
-queue is registered). After that, printers are expected to be IPP Everywhere devices that need no driver (the same idea as AirPrint),
-and other printers are used through a "Printer Application": a small server on the computer that presents the printer as an IPP
-Everywhere device. macOS 27 ships CUPS 2.3, and PPD drivers still work.
+queue is created). After that, printers are expected to be IPP Everywhere devices that need no driver (the same idea as AirPrint),
+and other printers are used through a "Printer Application": a server on the computer that acts as an IPP Everywhere printer.
+v2.0 makes this the standard setup (macOS 27 ships CUPS 2.3, and PPD drivers still work).
 
-To be ready for that, the code is split in two:
+`evolis-printer-app` in [`printer-app/`](printer-app/) is built with [PAPPL](https://www.msweet.org/pappl/), a library for writing Printer Applications.
 
-- **[`driver/evolis_card.c`](driver/evolis_card.c)** (core): turns a card RGB image and options into the commands sent to the printer
-  (`Pr` / `Pc` / `Pl` / `Ss`…`Se` / `Db`), including the halftone calibration, half-panel handling and overlay masks.
-  It depends on neither CUPS nor PPDs
-- **[`driver/rastertoevolis.c`](driver/rastertoevolis.c)** (CUPS front end): reads CUPS raster, passes the PPD and print dialog options
-  to the core, and reports errors to the queue
+| | |
+|---|---|
+| Accepted formats | Apple raster (URF, which macOS sends) and PWG raster; 300 dpi, sRGB / gray 8-bit |
+| Media | CR80 (85.6 × 54 mm, landscape, borderless) only. Advertised in landscape like the PPD, because in portrait macOS puts a landscape PDF on it unrotated and cuts off the right side |
+| Printing | Collects each received page and passes it through the same core as the CUPS filter (`evolis_card.c`). Blank pages are skipped and pages that are not card-sized stop the job, as with the filter |
+| Ribbon and densities | Vendor attributes (`evolis-ribbon`, `evolis-overlay`, `evolis-black-mode`, `evolis-black-density`, `evolis-color-density`, `evolis-color-brightness`, `evolis-overlay-density`; same values as the PPD). They do not appear in the print dialog, so they are set as printer defaults in Evolis Utility (or with `evolis-printer-app modify`) |
+| USB | No libusb; reads and writes with IOUSBHost like Evolis Utility ([`usb-device.m`](printer-app/usb-device.m), `evolis-usb://`) |
+| Pre-built data | Data sent as `application/vnd.evolis` goes to the printer as is (`evolis-tool` uses it to send the test card and other commands) |
+| How it runs | A root LaunchDaemon. Listens only on localhost and advertises over DNS-SD to this Mac only (`server-hostname=localhost`, `listen-hostname=localhost`, port 8630) |
+| Web settings | PAPPL's web settings page is also available at `http://localhost:8630/` (English and Japanese, with the same labels as the PPD) |
 
-An IPP Everywhere / AirPrint printer receives PWG raster (`image/pwg-raster`, the same format as CUPS raster v2) or
-Apple raster (`image/urf`), and `rastertoevolis` reads both.
+Verified (2026-10-14, macOS 27.0.1 on Apple Silicon, firmware 1510, half-panel YMCKO R3013):
 
-#### Printer Application prototype ([`ipp/`](ipp/))
+- sample-card.pdf printed from Preview's print dialog came out the same as with the PPD driver (with the default ribbon `ymckos`)
+- macOS registers it as a driverless queue (`lpadmin -m everywhere`). As with the PPD, the paper size opens as "Other"
+- The print dialog only shows paper feed, color mode and print quality
+- 1-bit black (`black_1`) is not accepted (PAPPL would only convert it to sRGB before passing it on, so clients send gray or color)
 
-There is a prototype built on `ippeveprinter`, which ships with macOS (it comes with CUPS and acts as an IPP Everywhere printer).
-It needs no PAPPL or other installs.
-
-- [`ipp/evolis-pebble4.conf`](ipp/evolis-pebble4.conf): IPP attributes. 300 dpi, sRGB / gray 8-bit, CR80 (landscape, borderless) as the only media
-- [`ipp/evolis-ipp-print`](ipp/evolis-ipp-print): runs for each job, converts the raster with `rastertoevolis`, and sends it to the printer with
-  [`evolis-usb-send`](driver/evolis-usb-send.swift) (the same USB code as Evolis Utility)
-- [`ipp/evolis-ipp-server`](ipp/evolis-ipp-server): starts `ippeveprinter` with the two above
-
-```bash
-ipp/evolis-ipp-server --ribbon ymckos                       # Ctrl-C to stop
-ipp/evolis-ipp-server --ribbon k --option EvolisOverlay=none --output /tmp/evolis   # write files instead of sending over USB
-```
-
-It advertises itself over DNS-SD, so "Evolis Pebble 4" shows up when adding a printer in System Settings → Printers & Scanners
-(no driver needed). Ribbon and densities do not appear in the print dialog, so set them when starting it with `--ribbon` / `--option`
-(the same keys as the PPD).
-
-Verified (2026-10-14, without the printer, by having the print data written to files):
-
-- PWG raster, Apple raster and portrait pages sent over IPP produce output identical to the CUPS filter, byte for byte (`tests/ipp.sh`)
-- Added to macOS without a driver (`lpadmin -m everywhere`), the paper size is CR80 from the start and macOS sends Apple raster.
-  Printing sample-card.pdf with `lp` gives the same card as the PPD driver (the page is 637 dots tall vs 638 with the PPD, about half a dot of shift)
-- Advertising the media as portrait (54 × 85.6 mm) makes macOS put a landscape PDF on it unrotated, cutting off the right side,
-  so it is advertised as landscape, like the PPD
-- `ippeveprinter` takes one job at a time (it answers "busy" to the next one, and macOS waits and resends)
-
-Verified on the printer (2026-10-14, firmware 1510, YMCKO half-panel R3013):
-
-- sample-card.pdf sent with `lp` went over USB through `evolis-usb-send`, and the card came out correctly
-- Printing from Preview's print dialog works too. As with the PPD driver, the paper size opens as "Other (A4)", so pick
-  "85.6x54mm.Borderless". The only options are color mode and print quality (the ribbon and the rest are set when starting the server)
-- At first, print dialog jobs stopped with "the printer cannot print with the specified options": the dialog sends the paper as a size,
-  and `media-size-supported` was missing. Adding it fixed this (`tests/ipp.sh` checks it without printing)
-
-Not yet verified: starting automatically at login (launchd), and other ribbons such as full-panel YMCKO or black.
-Also, `ippeveprinter` ships with CUPS 2.x and may go away together with PPDs; then the same thing would be built with
-PAPPL or similar (the shape, where `evolis-ipp-print` hands the received raster to `rastertoevolis`, stays the same).
+While building it, a prototype on macOS's `ippeveprinter` was also made and tested (commits 44f7146 to c9abf83; removed since).
 
 ## References and their licenses
 
@@ -615,6 +647,15 @@ specifications and data formats were used.
 | [qzind/tray](https://github.com/qzind/tray) (`Evolis.java`) | LGPL-2.1 | how to pack Y/M/C with a bit depth that depends on the number of levels |
 | [NEC MultiImpact 700XX macOS driver](https://github.com/yukino1230/multiimpact-700xx-macos-driver) | MIT (same author) | how the CUPS filter, PPD and `install.sh` are built (written the same way) |
 
+### Bundled libraries
+
+The Printer Application statically links the following libraries. Their license texts are installed by the pkg in `/usr/local/share/evolis/licenses`.
+
+| Library | License | Used for |
+|---|---|---|
+| [PAPPL](https://www.msweet.org/pappl/) 1.4.12 | Apache License 2.0 (with optional exceptions for portions embedded in compiled programs and for combining with GPLv2 software) | IPP Everywhere server, web settings, DNS-SD, job handling |
+| [LibreSSL](https://www.libressl.org/) 4.3.3 | OpenSSL License / ISC License and others | TLS used by PAPPL |
+
 ## Unofficial / trademarks
 
 This software is an unofficial driver unrelated to Evolis, and is not endorsed, warranted or supported by Evolis.
@@ -626,7 +667,7 @@ registered trademarks of their respective owners. The names are used here only t
 This software comes with no warranty ([LICENSE](LICENSE)). The author is not liable for any damage resulting from its use. In particular:
 
 - **Cards and ribbons are consumables.** Wrong settings (such as the wrong ribbon type) or bugs can waste cards and ribbons
-- **A wrong ribbon type can jam the card or break the ribbon.** Always make the ribbon in the print dialog match the loaded ribbon
+- **A wrong ribbon type can jam the card or break the ribbon.** Always make the ribbon in Evolis Utility's Print settings (or in the print dialog with the PPD driver) match the loaded ribbon
 - Ribbons not tested on a printer (full-panel YMCKO, KO, single colors other than black) are sent as the guide describes them
 - The driver changes settings stored in the printer (ribbon type, contrast). Set them again in the official driver or software if you go back to it
 

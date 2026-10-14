@@ -92,20 +92,6 @@ final class EvolisPrinter {
         catch { throw EvolisError.io(error.localizedDescription) }
     }
 
-    /// 用意済みのバイト列(rastertoevolis が作った印刷データなど)をそのまま送る。大きいので区切って送る。
-    /// 本体が前のカードを刷っている間は受け取りが止まるので、待ち時間を長めにする
-    func write(_ data: Data, timeout: TimeInterval = 120) throws {
-        var offset = 0
-        while offset < data.count {
-            let chunk = NSMutableData(data: data.subdata(in: offset..<min(offset + 65536, data.count)))
-            var sent = 0
-            do { try outPipe.__sendIORequest(with: chunk, bytesTransferred: &sent, completionTimeout: timeout) }
-            catch { throw EvolisError.io(error.localizedDescription) }
-            guard sent > 0 else { throw EvolisError.io("no data accepted") }
-            offset += sent
-        }
-    }
-
     /// コマンドを送って返事を読む。前の返事が残っていることがあるので、先に Rtp で読み捨てる。
     /// 本体が新しい返事を用意する前に読むと Rtp の返事がもう一度返るので、変わるまで読み直す
     func query(_ command: String, timeout: TimeInterval = 4) throws -> String {
