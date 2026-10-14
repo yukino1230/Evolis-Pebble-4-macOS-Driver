@@ -4,7 +4,7 @@
   python3 tools/make_icon.py app/Resources/AppIcon.icns
   python3 tools/make_icon.py icon.png        # 確かめる用
   python3 tools/make_icon.py --printer printer-app/printer-icon.png
-                                             # プリンタのアイコン(歯車なし、512 px)。Printer Application が使う
+                                             # プリンタのアイコン(Pebble 4 をデフォルメした絵、512 px)。Printer Application が使う
 
 Evolis のロゴは使わない(商標)。1024 px で描いて、iconutil で .icns にまとめる。
 """
@@ -14,7 +14,7 @@ import subprocess
 import sys
 import tempfile
 
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 N = 1024
 SS = 4                      # 4 倍で描いて縮め、縁を滑らかにする
@@ -24,7 +24,7 @@ def s(*v):
     return [round(x * SS) for x in v]
 
 
-def draw(with_gear=True):
+def draw():
     big = N * SS
     img = Image.new("RGBA", (big, big), (0, 0, 0, 0))
 
@@ -41,58 +41,123 @@ def draw(with_gear=True):
 
     d = ImageDraw.Draw(img)
 
-    # 出てくるカード(CR80 の縦横比 85.6:54)
-    cx0, cy0, cw = 322, 238, 380
-    ch = round(cw * 54 / 85.6)
-    card = (cx0, cy0, cx0 + cw, cy0 + ch)
-    shadow = Image.new("RGBA", (big, big), (0, 0, 0, 0))
-    ImageDraw.Draw(shadow).rounded_rectangle(s(card[0] + 6, card[1] + 14, card[2] + 6, card[3] + 14),
-                                             radius=26 * SS, fill=(0, 0, 0, 90))
-    img.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(14 * SS)))
-    d.rounded_rectangle(s(*card), radius=26 * SS, fill=(255, 255, 255, 255))
-    # 顔写真の枠と人の形
-    px0, py0 = cx0 + 34, cy0 + 40
-    d.rounded_rectangle(s(px0, py0, px0 + 96, py0 + 118), radius=12 * SS, fill=(214, 228, 245, 255))
-    d.ellipse(s(px0 + 28, py0 + 20, px0 + 68, py0 + 60), fill=(60, 110, 190, 255))
-    d.pieslice(s(px0 + 12, py0 + 66, px0 + 84, py0 + 150), 180, 360, fill=(60, 110, 190, 255))
-    # 文字の行
-    for i, w in enumerate((190, 150, 170)):
-        y = py0 + 12 + i * 34
-        d.rounded_rectangle(s(px0 + 124, y, px0 + 124 + w, y + 16), radius=8 * SS, fill=(200, 208, 220, 255))
-    # 上の帯(YMCK の色)
-    band = [(250, 204, 21), (236, 72, 153), (14, 165, 233), (40, 40, 48)]
-    bw = (cw - 68) / 4
-    for i, c in enumerate(band):
-        x = cx0 + 34 + i * bw
-        d.rectangle(s(x, cy0 + 16, x + bw, cy0 + 26), fill=c + (255,))
+    # プリンタ(Pebble 4 をデフォルメした絵。プリンタのアイコンと同じ)を枠の中に置く
+    printer = draw_printer(hires=True)
+    size = 640 * SS
+    img.alpha_composite(printer.resize((size, size), Image.LANCZOS), (round(150 * SS), round(165 * SS)))
 
-    # プリンタ本体(カードの下半分を隠す)
-    body = (214, 468, 810, 780)
-    shadow = Image.new("RGBA", (big, big), (0, 0, 0, 0))
-    ImageDraw.Draw(shadow).rounded_rectangle(s(body[0], body[1] + 24, body[2], body[3] + 24),
-                                             radius=70 * SS, fill=(0, 0, 0, 110))
-    img.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(22 * SS)))
-    d = ImageDraw.Draw(img)
-    d.rounded_rectangle(s(*body), radius=70 * SS, fill=(244, 246, 250, 255))
-    # 上面の明るい帯と、カードの出口
-    d.rounded_rectangle(s(body[0], body[1], body[2], body[1] + 70), radius=70 * SS, fill=(255, 255, 255, 255))
-    d.rectangle(s(body[0], body[1] + 40, body[2], body[1] + 70), fill=(255, 255, 255, 255))
-    d.rounded_rectangle(s(cx0 - 22, body[1] - 10, cx0 + cw + 22, body[1] + 14), radius=12 * SS,
-                        fill=(52, 60, 76, 255))
-    # 前面のパネルと状態のランプ
-    d.rounded_rectangle(s(body[0] + 56, body[1] + 120, body[2] - 56, body[1] + 140), radius=10 * SS,
-                        fill=(214, 220, 230, 255))
-    # 状態のランプ。歯車を付けるときは歯車に隠れないよう左に寄せる
-    lamp = body[0] + 290 if with_gear else body[2] - 128
-    d.ellipse(s(lamp, body[3] - 104, lamp + 36, body[3] - 68), fill=(34, 197, 94, 255))
-    d.rounded_rectangle(s(body[0] + 64, body[3] - 96, body[0] + 260, body[3] - 76), radius=10 * SS,
-                        fill=(214, 220, 230, 255))
-
-    # 右下に歯車(設定や状態を見るアプリだとわかるように)。プリンタのアイコンには付けない
-    if with_gear:
-        gear(img, 716, 716, 150)
+    # 右下に歯車(設定や状態を見るアプリだとわかるように)
+    gear(img, 716, 716, 150)
 
     return img.resize((N, N), Image.LANCZOS)
+
+
+def draw_printer(hires=False):
+    """プリンタのアイコン: Pebble 4 を横から見た形をデフォルメした絵(背景なし)。
+    白い本体は前が低く、後ろへ盛り上がってから丸く下りる(かまぼこ形)。上を透明な緑のカバーが覆い、
+    後ろの上にカードフィーダー、前の口からカードが出てくる。ロゴは描かない"""
+    big = N * SS
+    img = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+    X0, X1, PEAK, BOTTOM, TOP = 170, 900, 640, 840, 330
+
+    def top(x):
+        """本体の上の輪郭の高さ(y)"""
+        if x <= PEAK:
+            u = (PEAK - x) / (PEAK - 130)
+            return BOTTOM - (BOTTOM - TOP) * max(0.0, 1 - u * u) ** 0.5
+        u = (x - PEAK) / (X1 - PEAK)
+        return BOTTOM - (BOTTOM - TOP) * max(0.0, 1 - u ** 2.2) ** (1 / 2.2)
+
+    xs = [X0 + (X1 - X0) * i / 400 for i in range(401)]
+    outline = [(x, top(x)) for x in xs] + [(X1, BOTTOM), (X0, BOTTOM)]
+
+    def poly_mask(points):
+        m = Image.new("L", (big, big), 0)
+        ImageDraw.Draw(m).polygon([(round(x * SS), round(y * SS)) for x, y in points], fill=255)
+        return m
+
+    body = poly_mask(outline)
+    # 前の下の角を丸める
+    corner = Image.new("L", (big, big), 255)
+    cd = ImageDraw.Draw(corner)
+    cd.rectangle(s(X0, BOTTOM - 40, X0 + 40, BOTTOM), fill=0)
+    cd.pieslice(s(X0, BOTTOM - 80, X0 + 80, BOTTOM), 90, 180, fill=255)
+    body = ImageChops.multiply(body, corner)
+
+    # 影
+    shadow = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+    ImageDraw.Draw(shadow).ellipse(s(180, 805, 900, 885), fill=(0, 0, 0, 90))
+    img.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(18 * SS)))
+
+    # カードフィーダー(後ろの上、透明な緑の箱。中にカードの束)。下は本体に隠れる
+    feeder = (540, 170, 770, 420)
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle(s(*feeder), radius=26 * SS, fill=(40, 150, 60, 255))
+    d.rounded_rectangle(s(feeder[0] + 12, feeder[1] + 12, feeder[2] - 12, feeder[1] + 28), radius=8 * SS,
+                        fill=(120, 205, 130, 255))
+    for i in range(5):
+        y = feeder[1] + 46 + i * 22
+        d.rounded_rectangle(s(feeder[0] + 32, y, feeder[2] - 32, y + 12), radius=6 * SS, fill=(225, 245, 228, 255))
+
+    # 縁取り(白い背景でも形がわかるように)と、白い本体
+    img.paste((150, 158, 172, 255), (0, 0), body.filter(ImageFilter.MaxFilter(9)))
+    base = Image.new("RGBA", (big, big))
+    gd = ImageDraw.Draw(base)
+    for y in range(big):
+        c = round(250 - 36 * max(0.0, y / big - 0.5))
+        gd.line([(0, y), (big, y)], fill=(c, c, min(255, c + 4), 255))
+    img.paste(base, (0, 0), body)
+
+    # 緑のカバー: 上の輪郭に沿った帯。前の方を厚くする(実物も排出口の上までカバーが下りている)
+    def thick(x):
+        t = (x - X0) / (X1 - X0)
+        return 175 - 45 * t
+    cx0, cx1 = X0 + 10, X1 - 60
+    band = [(x, top(x) - 6) for x in xs if cx0 <= x <= cx1]
+    band += [(x, top(x) + thick(x)) for x in reversed(xs) if cx0 <= x <= cx1]
+    cover = ImageChops.multiply(poly_mask(band), body)
+    green = Image.new("RGBA", (big, big))
+    gd = ImageDraw.Draw(green)
+    for y in range(big):
+        t = y / big
+        gd.line([(0, y), (big, y)], fill=(round(80 - 40 * t), round(200 - 60 * t), round(90 - 40 * t), 255))
+    img.paste(green, (0, 0), cover)
+    # カバーのつや(輪郭に沿った明るい線)
+    gloss = [(x, top(x) + 24) for x in xs if 290 <= x <= 700]
+    d = ImageDraw.Draw(img)
+    d.line([(round(x * SS), round(y * SS)) for x, y in gloss], fill=(185, 240, 190, 255), width=14 * SS, joint="curve")
+
+    # 横の操作パネル: カバーのすぐ下にランプ 4 つとボタン
+    for i, x in enumerate((420, 460, 500, 540)):
+        y = top(x) + thick(x) + 26
+        d.ellipse(s(x - 9, y - 9, x + 9, y + 9), fill=(150, 158, 172, 255))
+    bx = 370
+    by = top(bx) + thick(bx) + 34
+    d.ellipse(s(bx - 20, by - 20, bx + 20, by + 20), fill=(175, 182, 196, 255))
+
+    # 前の口(カードが出てくるところ)と、出てくるカード(少し傾ける)
+    d.rounded_rectangle(s(X0 - 6, 742, X0 + 70, 800), radius=22 * SS, fill=(55, 62, 76, 255))
+    card = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+    cd = ImageDraw.Draw(card)
+    kx, ky, kw, kh = 40, 640, 200, 126
+    cd.rounded_rectangle(s(kx, ky, kx + kw, ky + kh), radius=16 * SS, fill=(255, 255, 255, 255),
+                         outline=(150, 158, 172, 255), width=4 * SS)
+    cd.rectangle(s(kx + 14, ky + 14, kx + kw - 14, ky + 28), fill=(60, 110, 190, 255))
+    cd.rounded_rectangle(s(kx + 16, ky + 40, kx + 64, ky + 108), radius=7 * SS, fill=(214, 228, 245, 255))
+    cd.ellipse(s(kx + 30, ky + 50, kx + 50, ky + 70), fill=(60, 110, 190, 255))
+    cd.pieslice(s(kx + 22, ky + 76, kx + 58, ky + 124), 180, 360, fill=(60, 110, 190, 255))
+    for i, w in enumerate((96, 72, 84)):
+        y = ky + 46 + i * 21
+        cd.rounded_rectangle(s(kx + 78, y, kx + 78 + w, y + 10), radius=5 * SS, fill=(200, 208, 220, 255))
+    card = card.rotate(-14, resample=Image.BICUBIC, center=(round((kx + kw) * SS), round((ky + kh) * SS)))
+    img.alpha_composite(card)
+
+    # 絵が枠いっぱいになるよう、まわりの余白を詰めて正方形の真ん中に置く(小さく出したときも見えるように)
+    x0, y0, x1, y1 = img.getbbox()
+    side = round(max(x1 - x0, y1 - y0) * 1.04)
+    square = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+    square.paste(img.crop((x0, y0, x1, y1)), ((side - (x1 - x0)) // 2, (side - (y1 - y0)) // 2))
+    return square if hires else square.resize((N, N), Image.LANCZOS)
 
 
 def gear(img, cx, cy, r, teeth=8):
@@ -136,11 +201,11 @@ def main():
     printer = "--printer" in args
     args = [a for a in args if a != "--printer"]
     out = args[0] if args else "AppIcon.icns"
-    icon = draw(with_gear=not printer)
     if printer:
-        icon.resize((512, 512), Image.LANCZOS).save(out, optimize=True)
+        draw_printer().resize((512, 512), Image.LANCZOS).save(out, optimize=True)
         print(out)
         return
+    icon = draw()
     if out.endswith(".png"):                  # 確かめる用に PNG でも出せる
         icon.save(out)
         print(out)
