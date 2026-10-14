@@ -10,12 +10,14 @@ func L(_ key: String) -> String { NSLocalizedString(key, comment: "") }
 enum EvolisError: LocalizedError {
     case notFound
     case busy
+    case noReply(String)
     case io(String)
 
     var errorDescription: String? {
         switch self {
         case .notFound: return L("Printer not found. Check the USB cable and the power.")
         case .busy:     return L("The printer is busy (printing, etc.). Refresh when it is done.")
+        case .noReply(let c): return String(format: L("No reply from the printer (%@)"), c)
         case .io(let s): return String(format: L("Communication failed: %@"), s)
         }
     }
@@ -66,6 +68,18 @@ final class EvolisPrinter {
 
     deinit { interface.destroy() }
 
+    /// 返事を待っている間のタイムアウト(kIOReturnTimeout / kIOUSBTransactionTimeout / タイムアウトで取り消された kIOReturnAborted)
+    private static let timeoutCodes: Set<Int> = [Int(Int32(bitPattern: 0xE000_02D6)), Int(Int32(bitPattern: 0xE000_4051)),
+                                                 Int(Int32(bitPattern: 0xE000_02EB))]
+
+    /// プリンタが USB につながっているか(開かずに調べる)
+    static func isConnected() -> Bool {
+        let s = findPrinterInterface()
+        guard s != IO_OBJECT_NULL else { return false }
+        IOObjectRelease(s)
+        return true
+    }
+
     private static func findPrinterInterface() -> io_service_t {
         var iterator: io_iterator_t = 0
         guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("IOUSBHostInterface"), &iterator) == KERN_SUCCESS
@@ -111,6 +125,8 @@ final class EvolisPrinter {
             Thread.sleep(forTimeInterval: 0.1)
             reply = try read(until: deadline)
         }
+        // 待っても前の返事のままなら、返事が無かった(本体が知らないコマンドなど)。前の返事を値として返さない
+        if reply == stale && !stale.isEmpty { throw EvolisError.noReply(command) }
         return reply
     }
 
@@ -128,8 +144,10 @@ final class EvolisPrinter {
             do {
                 try inPipe.__sendIORequest(with: chunk, bytesTransferred: &got, completionTimeout: 0.3)
                 buf.append(chunk.bytes.assumingMemoryBound(to: UInt8.self), count: got)
-            } catch {
+            } catch let e as NSError where Self.timeoutCodes.contains(e.code) {
                 continue                                         // 返事がまだ無い(タイムアウト)
+            } catch {
+                throw EvolisError.io(error.localizedDescription)  // 抜かれたなど。待っても返事は来ない
             }
         }
         let text = buf.split(separator: 0, maxSplits: 1, omittingEmptySubsequences: false).first ?? Data()

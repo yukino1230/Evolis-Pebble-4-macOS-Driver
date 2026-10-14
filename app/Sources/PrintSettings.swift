@@ -70,22 +70,22 @@ final class PrintSettings: ObservableObject {
             p.standardOutput = pipe
             p.standardError = pipe
             var output = ""
+            var ok = false
             do {
                 try p.run()
                 output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
                 p.waitUntilExit()
+                ok = p.terminationStatus == 0
             } catch {
-                output = error.localizedDescription
+                output = error.localizedDescription            // 起動できなかったときは終了コードを読まない
             }
-            let ok = p.terminationStatus == 0
+            let succeeded = ok
             let canceled = output.contains("-128")          // パスワードの画面でキャンセルした
             let message = output.trimmingCharacters(in: .whitespacesAndNewlines)
             await MainActor.run {
                 self.changingShare = false
                 self.loadShared()
-                if !ok && !canceled {
-                    self.error = String(format: L("Could not change sharing: %@"), message)
-                }
+                self.error = succeeded || canceled ? nil : String(format: L("Could not change sharing: %@"), message)
             }
         }
     }
@@ -118,10 +118,15 @@ final class PrintSettings: ObservableObject {
         }
     }
 
+    /// 設定の変更は 1 つずつ順番に行う(矢印を続けて押したとき、前の変更があとから届いて値が戻らないように)
+    private var lastChange: Task<Void, Never>?
+
     func set(_ attr: String, _ value: String) {
         guard values[attr] != value else { return }
         values[attr] = value
-        Task.detached {
+        let previous = lastChange
+        lastChange = Task.detached {
+            await previous?.value
             guard Self.serverRunning() else {
                 await MainActor.run { self.available = false }
                 return

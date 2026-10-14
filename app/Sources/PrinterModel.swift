@@ -20,7 +20,10 @@ final class PrinterModel: ObservableObject {
     /// 状態を読み直す。done は読み終わったあとに出すメッセージ
     func refresh(done: String? = nil) {
         run(label: nil) { p in
-            func q(_ c: String) throws -> String { try p.query(c) }
+            // 返事が無い項目(本体が知らないコマンドなど)は「—」にして、ほかの項目は読み続ける
+            func q(_ c: String) throws -> String {
+                do { return try p.query(c) } catch EvolisError.noReply { return "—" }
+            }
             let printer = [
                 StatusRow(label: L("Model"), value: try q("Rtp")),
                 StatusRow(label: L("Firmware"), value: try q("Rfv")),
@@ -40,7 +43,8 @@ final class PrinterModel: ObservableObject {
             ]
             let due = try q("Rlr;r")
             let cleaning = [
-                StatusRow(label: L("Cleaning due"), value: due == "OK" ? L("Not yet") : String(format: L("Clean the printer (%@)"), due)),
+                StatusRow(label: L("Cleaning due"), value: due == "OK" ? L("Not yet") : due == "—" ? due
+                                                        : String(format: L("Clean the printer (%@)"), due)),
                 StatusRow(label: L("Cleanings"), value: String(format: L("%@ times"), Self.number(try q("Rco;n")))),
                 StatusRow(label: L("Average cleaning interval"), value: String(format: L("%@ cards"), Self.number(try q("Rco;a")))),
                 StatusRow(label: L("Maximum cleaning interval"), value: String(format: L("%@ cards"), Self.number(try q("Rco;m")))),
@@ -50,7 +54,7 @@ final class PrinterModel: ObservableObject {
                 model.headKit = kit
                 model.settings = settings
                 model.cleaning = cleaning
-                model.needsCleaning = due != "OK"
+                model.needsCleaning = due != "OK" && due != "—"
                 model.message = done
             }
         }
@@ -76,7 +80,12 @@ final class PrinterModel: ObservableObject {
         if overlay { commands.append("Pc;o;=;\(n("evolis-overlay-density"))") }
         let send = commands
         run(label: L("Sending the settings to the printer…")) { p in
-            for c in send { _ = try p.query(c) }
+            for c in send {
+                let reply = try p.query(c)
+                guard reply == "OK" else {
+                    throw EvolisError.io(String(format: L("The printer did not accept %@ (reply: %@)"), c, reply))
+                }
+            }
             return { _ in }
         } then: { [weak self] in
             self?.refresh(done: L("Sent the settings to the printer."))
@@ -110,7 +119,13 @@ final class PrinterModel: ObservableObject {
             let deadline = Date().addingTimeInterval(180)
             Thread.sleep(forTimeInterval: 5)
             while Date() < deadline {
-                if (try? p.query("Rtp", timeout: 2)) == "Pebble 4" { break }
+                // 動いている間は返事が無い。抜かれたなどの USB のエラーなら、待たずにやめる
+                do {
+                    if try p.query("Rtp", timeout: 2) == "Pebble 4" { break }
+                } catch {
+                    // 動いている間は返事が無かったり読めなかったりする。抜かれたときだけ、待たずにやめる
+                    if !EvolisPrinter.isConnected() { throw EvolisError.notFound }
+                }
                 Thread.sleep(forTimeInterval: 3)
             }
             return { _ in }
