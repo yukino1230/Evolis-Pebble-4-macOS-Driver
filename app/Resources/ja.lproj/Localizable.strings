@@ -40,6 +40,7 @@
 "Print a technical test card?" = "技術テストカードを刷りますか？";
 "Print a test card?" = "テストカードを刷りますか？";
 "Print head kit number" = "プリントヘッドのキット番号";
+"Print settings…" = "印刷の設定…";
 "Print" = "刷る";
 "Printer not found. Check the USB cable and the power." = "プリンタが見つかりません。USB の接続と電源を確かめてください。";
 "Printer" = "プリンタ";

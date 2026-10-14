@@ -69,6 +69,12 @@ for _ in $(seq 1 60); do [ "$(finished)" -gt "$before" ] && break; sleep 0.5; do
 out="$(ls -t "$WORK/out"/*.prn | head -1)"
 check printer-defaults "$(shasum -a 256 < "$out" | cut -c1-16)" "$(expected ymckos-chip)"
 
+# 変換済みのデータ(application/vnd.evolis)はそのまま送る。evolis-tool がテストカードなどのコマンドを送るのに使う
+before="$(finished)"
+printf '\033St\r' | "$APP" submit -d Test -o document-format=application/vnd.evolis -o job-name=raw - >/dev/null
+for _ in $(seq 1 60); do [ "$(finished)" -gt "$before" ] && break; sleep 0.5; done
+check raw-command "$(od -An -c "$WORK/out/raw.prn" 2>/dev/null | tr -s ' ' | sed 's/ *$//')" " 033 S t \r"
+
 # 用紙がカードでないジョブは刷らずに止める(出力が無い。PAPPL が先に開くので空のファイルは残る)
 check a4 "$(send a4 a4.ras image/pwg-raster k full gray)" none
 # 印刷ダイアログと同じ形(用紙を media-col の大きさで指定)のジョブを受け付けるか(刷らない)

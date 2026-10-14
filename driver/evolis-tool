@@ -35,6 +35,12 @@ if [ -z "$QUEUE" ]; then
     if lpstat -v "$q" 2>/dev/null | grep -q "usb://EVOLIS/"; then QUEUE="$q"; break; fi
   done
 fi
+# PPD のキューが無ければ、Printer Application(evolis-printer-app)に送る
+APP=/usr/local/libexec/evolis/evolis-printer-app
+USE_APP=0
+if [ -z "$QUEUE" ] && [ -x "$APP" ] && "$APP" printers 2>/dev/null | grep -qx "Evolis Pebble 4"; then
+  USE_APP=1; QUEUE="Evolis Pebble 4"
+fi
 [ -n "$QUEUE" ] || { say "No Evolis queue found. Specify it with --queue" "Evolis のキューが見つかりません。--queue で指定してください"; exit 1; }
 
 case "$ACTION" in
@@ -46,5 +52,11 @@ case "$ACTION" in
             read -r -p "$(say "Type yes when ready: " "準備ができたら yes と入力: ")" ok
             [ "$ok" = "yes" ] || { say "Cancelled" "やめました"; exit 0; } ;;
 esac
-printf '\033%s\r' "$CMD" | lp -d "$QUEUE" -o raw -t "evolis-tool $ACTION" >/dev/null
+if [ "$USE_APP" = 1 ]; then
+  # 変換済みのデータとして、そのままプリンタに送らせる
+  printf '\033%s\r' "$CMD" | "$APP" submit -d "$QUEUE" -o document-format=application/vnd.evolis \
+                                   -o job-name="evolis-tool $ACTION" - >/dev/null
+else
+  printf '\033%s\r' "$CMD" | lp -d "$QUEUE" -o raw -t "evolis-tool $ACTION" >/dev/null
+fi
 say "$WHAT sent to $QUEUE." "$WHAT を $QUEUE に送りました。"

@@ -1,13 +1,23 @@
 #!/bin/bash
 # Evolis Pebble 4 のプリンタキューを登録する(pkg で入れたあとに使う)
 #   sudo evolis-setup [--ribbon k|ymcko|ymckos|ko|kw|kr|kbl|kgr|kgo|ksi|ksc|ka] [--queue Evolis_Pebble_4]
+#   sudo evolis-setup --ppd [--ribbon ...] [--queue ...]      PPD のドライバで登録する(以前のやり方)
 #   sudo evolis-setup --remove [--queue Evolis_Pebble_4]
-#     --ribbon は印刷ダイアログの既定のリボン(装着しているものに合わせる。既定 k)
+#     --ribbon は既定のリボン(装着しているものに合わせる。既定 k)
+#
+# 標準は Printer Application(evolis-printer-app、ドライバ無しの IPP Everywhere)で登録する。
+# 同じ名前のキューが PPD で登録されていれば、Printer Application に切り替わる。
 set -eu
 QUEUE="Evolis_Pebble_4"
 RIBBON="k"
 REMOVE=0
+MODE=app
 PPD=/usr/local/share/evolis/Pebble4.ppd
+APP=/usr/local/libexec/evolis/evolis-printer-app
+LABEL=jp.yukino.evolis-printer-app
+PRINTER="Evolis Pebble 4"                                   # Printer Application の中のプリンタ
+APP_URI="ipp://localhost:8630/ipp/print/Evolis_Pebble_4"
+USB_URI="evolis-usb://Evolis/Pebble%204"
 # メッセージの言語: LANG が ja なら日本語、それ以外は英語。LANG が無いとき(sudo で消えたときなど)や
 # 言語を決めていない C / POSIX のときは、macOS の言語設定(AppleLanguages の先頭)を見る
 lang="${LANG:-}"
@@ -23,6 +33,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --ribbon) RIBBON="$2"; shift 2 ;;
     --queue)  QUEUE="$2"; shift 2 ;;
+    --ppd)    MODE=ppd; shift ;;
     --remove) REMOVE=1; shift ;;
     *) say "Unknown argument: $1" "不明な引数: $1"; exit 1 ;;
   esac
@@ -35,18 +46,48 @@ fi
 case "$RIBBON" in k|ymcko|ymckos|ko|kw|kr|kbl|kgr|kgo|ksi|ksc|ka) ;;
   *) say "--ribbon must be one of k / ymcko / ymckos / ko / kw / kr / kbl / kgr / kgo / ksi / ksc / ka" \
          "--ribbon は k / ymcko / ymckos / ko / kw / kr / kbl / kgr / kgo / ksi / ksc / ka のどれか"; exit 1 ;; esac
-[ -f "$PPD" ] || { say "PPD not found: $PPD (install the pkg)" "PPD がありません: $PPD(pkg を入れてください)"; exit 1; }
 
-URI="$(lpinfo -v 2>/dev/null | awk '$2 ~ /^usb:\/\/EVOLIS\// {print $2; exit}')"
-[ -n "$URI" ] || { say "No Evolis printer found on USB. Check the power and the cable" \
-                        "USB で Evolis が見つかりません。電源と接続を確認してください"; exit 1; }
+if [ "$MODE" = ppd ]; then
+  [ -f "$PPD" ] || { say "PPD not found: $PPD (install the pkg)" "PPD がありません: $PPD(pkg を入れてください)"; exit 1; }
+  URI="$(lpinfo -v 2>/dev/null | awk '$2 ~ /^usb:\/\/EVOLIS\// {print $2; exit}')"
+  [ -n "$URI" ] || { say "No Evolis printer found on USB. Check the power and the cable" \
+                          "USB で Evolis が見つかりません。電源と接続を確認してください"; exit 1; }
+  # USB の送信処理が失敗したとき(ジョブの途中で電源を切ったときなど)、キュー全体を止めずにそのジョブだけ取り消す。
+  # ドライバ(フィルタ)が止めたジョブは、この設定と関係なくそのジョブだけが止まる
+  lpadmin -p "$QUEUE" -E -v "$URI" -P "$PPD" -D "Evolis Pebble 4" -L "USB" \
+          -o printer-is-shared=false -o EvolisRibbon="$RIBBON" -o printer-error-policy=abort-job
+  say "Done (PPD driver). Evolis Pebble 4 appears in System Settings > Printers & Scanners (default ribbon: $RIBBON)." \
+      "完了しました(PPD のドライバ)。「設定」>「プリンタとスキャナ」に Evolis Pebble 4 が出ます(既定のリボン: $RIBBON)。"
+  say "  After changing the ribbon: sudo lpadmin -p $QUEUE -o EvolisRibbon=<type>" \
+      "  リボンを付け替えたら: sudo lpadmin -p $QUEUE -o EvolisRibbon=<種類>"
+  say "  Remove: sudo evolis-setup --remove --queue $QUEUE" "  削除: sudo evolis-setup --remove --queue $QUEUE"
+  exit 0
+fi
 
-# USB の送信処理が失敗したとき(ジョブの途中で電源を切ったときなど)、キュー全体を止めずにそのジョブだけ取り消す。
-# ドライバ(フィルタ)が止めたジョブは、この設定と関係なくそのジョブだけが止まる
-lpadmin -p "$QUEUE" -E -v "$URI" -P "$PPD" -D "Evolis Pebble 4" -L "USB" \
-        -o printer-is-shared=false -o EvolisRibbon="$RIBBON" -o printer-error-policy=abort-job
+# --- Printer Application ---
+[ -x "$APP" ] || { say "Printer Application not found: $APP (install the pkg)" \
+                       "Printer Application がありません: $APP(pkg を入れてください)"; exit 1; }
+# 動いていなければ起動して、待ち受けるまで待つ
+launchctl print "system/$LABEL" >/dev/null 2>&1 || launchctl bootstrap system "/Library/LaunchDaemons/$LABEL.plist"
+for _ in $(seq 1 30); do [ -S /private/var/run/evolis-printer-app.sock ] && break; sleep 0.5; done
+[ -S /private/var/run/evolis-printer-app.sock ] || { say "The Printer Application did not start (see /Library/Logs/evolis-printer-app.log)" \
+                                                      "Printer Application が起動しません(/Library/Logs/evolis-printer-app.log を見てください)"; exit 1; }
+# プリンタが無ければ足す(USB につないでいなくても足せる)。リボンは既定値として覚えさせる
+"$APP" printers | grep -qx "$PRINTER" || "$APP" add -d "$PRINTER" -v "$USB_URI" -m evolis_pebble4
+"$APP" modify -d "$PRINTER" -o evolis-ribbon="$RIBBON"
+# macOS のキュー(ドライバ無しの IPP Everywhere)。同じ名前の PPD のキューがあれば置き換わる
+lpadmin -p "$QUEUE" -E -v "$APP_URI" -m everywhere -D "Evolis Pebble 4" -L "USB" \
+        -o printer-is-shared=false -o printer-error-policy=abort-job
 say "Done. Evolis Pebble 4 appears in System Settings > Printers & Scanners (default ribbon: $RIBBON)." \
     "完了しました。「設定」>「プリンタとスキャナ」に Evolis Pebble 4 が出ます(既定のリボン: $RIBBON)。"
-say "  After changing the ribbon: sudo lpadmin -p $QUEUE -o EvolisRibbon=<type>" \
-    "  リボンを付け替えたら: sudo lpadmin -p $QUEUE -o EvolisRibbon=<種類>"
-say "  Remove: sudo evolis-setup --remove" "  削除: sudo evolis-setup --remove"
+say "  Ribbon, overlay and densities: http://localhost:8630/ (or Evolis Utility > Print settings)" \
+    "  リボン・オーバーレイ・濃さの設定: http://localhost:8630/(Evolis Utility の「印刷の設定」からも開けます)"
+say "  Remove: sudo evolis-setup --remove --queue $QUEUE" "  削除: sudo evolis-setup --remove --queue $QUEUE"
+# 以前の PPD のキューが残っていれば知らせる(同じプリンタが 2 つ出るので)
+# (lpstat の表示は言語で変わるので、キューごとに URI を見る)
+for q in $(lpstat -e 2>/dev/null); do
+  [ "$q" = "$QUEUE" ] && continue
+  lpstat -v "$q" 2>/dev/null | grep -q 'usb://EVOLIS/' || continue
+  say "  The PPD queue \"$q\" is still registered. To remove it: sudo evolis-setup --remove --queue $q" \
+      "  PPD のキュー「$q」が残っています。消すときは: sudo evolis-setup --remove --queue $q"
+done

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Evolis Printer Application を起動したときから動かしておく(root で動く LaunchDaemon)。
+  この Mac からだけ使えるようにする: localhost でだけ待ち受け、DNS-SD もこの Mac にだけ広告する。
+  状態(プリンタと既定値)は /private/var/lib/evolis-printer-app.state に残る。
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>jp.yukino.evolis-printer-app</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/libexec/evolis/evolis-printer-app</string>
+    <string>server</string>
+    <string>-o</string><string>server-hostname=localhost</string>
+    <string>-o</string><string>listen-hostname=localhost</string>
+    <string>-o</string><string>server-port=8630</string>
+    <string>-o</string><string>spool-directory=/private/var/spool/evolis-printer-app</string>
+    <string>-o</string><string>log-file=/Library/Logs/evolis-printer-app.log</string>
+    <string>-o</string><string>log-level=info</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ProcessType</key><string>Background</string>
+</dict>
+</plist>

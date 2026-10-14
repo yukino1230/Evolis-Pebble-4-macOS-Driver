@@ -1,4 +1,5 @@
 // Evolis Pebble 4 のユーティリティ: 状態の表示、テストカード、クリーニング
+import AppKit
 import SwiftUI
 
 @main
@@ -63,6 +64,10 @@ struct ContentView: View {
                 Button("Technical test card…") { confirm = .technical }
                 Button("Clean…") { confirm = .clean }
                 Spacer()
+                // リボンや濃さは Printer Application(evolis-printer-app)の設定画面で決める
+                Button("Print settings…") {
+                    NSWorkspace.shared.open(URL(string: "http://localhost:8630/Evolis_Pebble_4/printing")!)
+                }
                 Button("Refresh") { model.refresh() }
                     .keyboardShortcut("r")
             }

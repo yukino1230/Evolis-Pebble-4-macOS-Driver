@@ -22,7 +22,8 @@ NOTARY="${EVOLIS_NOTARY:-}"
 
 rm -rf "$BUILD"; mkdir -p "$ROOT" "$BUILD/scripts"
 mkdir -p "$ROOT/usr/local/libexec/cups/filter" "$ROOT/usr/local/bin" "$ROOT/usr/local/share/evolis" \
-         "$ROOT/Library/Printers/PPDs/Contents/Resources" "$ROOT/Applications"
+         "$ROOT/Library/Printers/PPDs/Contents/Resources" "$ROOT/Applications" \
+         "$ROOT/usr/local/libexec/evolis" "$ROOT/Library/LaunchDaemons"
 
 echo "==> CUPS フィルタをビルド(ユニバーサル)"
 FILTER="$ROOT/usr/local/libexec/cups/filter/rastertoevolis"
@@ -35,6 +36,25 @@ if [ -n "$SIGN_APP" ]; then
   codesign --verify --strict "$FILTER"
 else
   echo "==> Developer ID Application が無いので未署名のままにします"
+fi
+
+echo "==> Printer Application をビルド(ユニバーサル)"
+# PAPPL と LibreSSL は初回だけソースからビルドする(printer-app/build-deps.sh)
+"$HERE/../printer-app/build.sh" "$VER" "$BUILD/printer-app" >/dev/null
+PAPP="$ROOT/usr/local/libexec/evolis/evolis-printer-app"
+install -m 755 "$BUILD/printer-app/evolis-printer-app" "$PAPP"
+ln -s ../libexec/evolis/evolis-printer-app "$ROOT/usr/local/bin/evolis-printer-app"
+# 組み込んだライブラリのライセンス(PAPPL: Apache 2.0、LibreSSL: OpenSSL / ISC)
+mkdir -p "$ROOT/usr/local/share/evolis/licenses"
+DEPSB="$HERE/../build/deps/build-arm64"
+install -m 644 "$DEPSB/pappl/LICENSE" "$ROOT/usr/local/share/evolis/licenses/PAPPL-LICENSE"
+install -m 644 "$DEPSB/pappl/NOTICE" "$ROOT/usr/local/share/evolis/licenses/PAPPL-NOTICE"
+install -m 644 "$DEPSB/libressl/COPYING" "$ROOT/usr/local/share/evolis/licenses/LibreSSL-COPYING"
+# 起動したときから動かす(root の LaunchDaemon)。postinstall で読み込む
+install -m 644 "$HERE/../printer-app/jp.yukino.evolis-printer-app.plist" "$ROOT/Library/LaunchDaemons/"
+if [ -n "$SIGN_APP" ]; then
+  codesign --force --options runtime --timestamp --sign "$SIGN_APP" "$PAPP"
+  codesign --verify --strict "$PAPP"
 fi
 
 echo "==> PPD を生成"
@@ -66,6 +86,11 @@ cat > "$BUILD/scripts/postinstall" <<'EOS'
 #!/bin/bash
 # CUPS に新しい PPD を認識させる
 killall -HUP cupsd 2>/dev/null || true
+# Printer Application を(入れ直したときは止めてから)起動する
+LABEL=jp.yukino.evolis-printer-app
+launchctl bootout "system/$LABEL" 2>/dev/null || true
+mkdir -p /private/var/spool/evolis-printer-app
+launchctl bootstrap system "/Library/LaunchDaemons/$LABEL.plist" 2>/dev/null || launchctl kickstart -k "system/$LABEL" || true
 exit 0
 EOS
 chmod 755 "$BUILD/scripts/postinstall"
