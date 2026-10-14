@@ -193,7 +193,7 @@ sudo pkgutil --forget jp.yukino.evolis-pebble4
 Xcode のコマンドラインツール（`xcode-select --install`）と python3 が要る。
 
 ```bash
-./driver/build-pkg.sh 2.1.2            # build/pkg/evolis-pebble4-2.1.2.pkg ができる
+./driver/build-pkg.sh 2.1.3            # build/pkg/evolis-pebble4-2.1.3.pkg ができる
 sudo driver/install.sh --ribbon k      # PPD のドライバだけを、pkg を作らずにその場でビルドして入れる（開発用）
 ```
 
@@ -662,7 +662,7 @@ v2.0 では、これを標準にした（今の macOS 27 は CUPS 2.3 で、PPD 
 | リボンと濃さ | 独自の属性（`evolis-ribbon`、`evolis-overlay`、`evolis-black-mode`、`evolis-black-density`、`evolis-color-density`、`evolis-color-brightness`、`evolis-overlay-density`。値は PPD と同じ）。印刷ダイアログには出ないので、プリンタの既定値として Evolis Utility（または `evolis-printer-app modify`）で決める |
 | USB | libusb は使わず、Evolis Utility と同じく IOUSBHost で読み書きする（[`usb-device.m`](printer-app/usb-device.m)、`evolis-usb://`） |
 | 変換済みのデータ | `application/vnd.evolis` で送ると、そのままプリンタに送る（`evolis-tool` がテストカードなどのコマンドを送るのに使う） |
-| 動かし方 | root の LaunchDaemon（ポート 8630）。既定では localhost でだけ待ち受け、DNS-SD もこの Mac にだけ知らせる（設定ファイルの `server-hostname=localhost`、`listen-hostname=localhost`）。共有するとこの 2 行を消し、ネットワークで待ち受けて AirPrint として知らせる |
+| 動かし方 | root の LaunchDaemon（ポート 8630）。既定では localhost でだけ待ち受け、DNS-SD もこの Mac にだけ知らせる（設定ファイルの `server-hostname=localhost`、`listen-hostname=localhost`）。共有するとこの 2 行を消し、ネットワークで待ち受けて AirPrint として知らせる。暗号化（IPPS）は使わない（`server-options=no-tls`。`_ipp` と `_ipps` の両方で知らせると、印刷ダイアログに同じプリンタが 2 つ以上出るため。v2.1.3 から） |
 | 設定画面 | 共有していないときは `http://localhost:8630/` で PAPPL の Web の設定画面も開ける（英語と日本語。表示名は PPD と同じ）。PAPPL 1.4 では、設定画面をネットワークから使えないようにする設定（`web-remote`）が効かないので、共有している間は設定画面を止める（`server-options=no-web-interface`）。IPP での設定の変更は、ネットワークからは PAPPL がもともと拒む（試して確認） |
 
 確かめたこと（2026-10-14、macOS 27.0.1 / Apple Silicon、ファームウェア 1510、YMCKO ハーフパネル R3013）:

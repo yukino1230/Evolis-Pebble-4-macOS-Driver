@@ -48,13 +48,14 @@ done
 if [ -n "$SHARE" ]; then
   # 共有するかどうかは Printer Application の設定ファイルで決め、起動し直して反映する
   if [ "$SHARE" = on ]; then
+    # no-tls: 暗号化(IPPS)を使わない。_ipp と _ipps の両方で知らせると、印刷ダイアログに同じプリンタが 2 つ出るため。
     # Web の設定画面は止める(PAPPL 1.4 は、設定画面をネットワークから使えないようにする設定が効かないため)。
     # 設定は Evolis Utility と evolis-printer-app modify(この Mac の中のソケット経由)で変える
     printf '%s\n' "# evolis-setup --share / --no-share が書き換える(今は、ほかの機器と共有している)" \
-                   "server-options=no-web-interface" > "$CONF"
+                   "server-options=no-web-interface,no-tls" > "$CONF"
   else
     printf '%s\n' "# evolis-setup --share / --no-share が書き換える(この 2 行があると、この Mac からだけ使える)" \
-                   "listen-hostname=localhost" "server-hostname=localhost" > "$CONF"
+                   "listen-hostname=localhost" "server-hostname=localhost" "server-options=no-tls" > "$CONF"
   fi
   chmod 644 "$CONF"
   launchctl kickstart -k "system/$LABEL" >/dev/null 2>&1 || launchctl bootstrap system "/Library/LaunchDaemons/$LABEL.plist"

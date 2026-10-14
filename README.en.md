@@ -199,7 +199,7 @@ sudo pkgutil --forget jp.yukino.evolis-pebble4
 Requires the Xcode command line tools (`xcode-select --install`) and python3.
 
 ```bash
-./driver/build-pkg.sh 2.1.2            # produces build/pkg/evolis-pebble4-2.1.2.pkg
+./driver/build-pkg.sh 2.1.3            # produces build/pkg/evolis-pebble4-2.1.3.pkg
 sudo driver/install.sh --ribbon k      # build and install only the PPD driver in place, without a pkg (for development)
 ```
 
@@ -672,7 +672,7 @@ v2.0 makes this the standard setup (macOS 27 ships CUPS 2.3, and PPD drivers sti
 | Ribbon and densities | Vendor attributes (`evolis-ribbon`, `evolis-overlay`, `evolis-black-mode`, `evolis-black-density`, `evolis-color-density`, `evolis-color-brightness`, `evolis-overlay-density`; same values as the PPD). They do not appear in the print dialog, so they are set as printer defaults in Evolis Utility (or with `evolis-printer-app modify`) |
 | USB | No libusb; reads and writes with IOUSBHost like Evolis Utility ([`usb-device.m`](printer-app/usb-device.m), `evolis-usb://`) |
 | Pre-built data | Data sent as `application/vnd.evolis` goes to the printer as is (`evolis-tool` uses it to send the test card and other commands) |
-| How it runs | A root LaunchDaemon (port 8630). By default it listens only on localhost and advertises over DNS-SD to this Mac only (`server-hostname=localhost` and `listen-hostname=localhost` in the config file). Sharing removes these two lines, so it listens on the network and advertises as AirPrint |
+| How it runs | A root LaunchDaemon (port 8630). By default it listens only on localhost and advertises over DNS-SD to this Mac only (`server-hostname=localhost` and `listen-hostname=localhost` in the config file). Sharing removes these two lines, so it listens on the network and advertises as AirPrint. Encryption (IPPS) is not used (`server-options=no-tls`; advertising both `_ipp` and `_ipps` made the same printer appear more than once in the print dialog. From v2.1.3) |
 | Web settings | When not sharing, PAPPL's web settings page is also available at `http://localhost:8630/` (English and Japanese, with the same labels as the PPD). PAPPL 1.4 does not enforce its setting that keeps the settings page off the network (`web-remote`), so the page is turned off while sharing (`server-options=no-web-interface`). PAPPL already refuses IPP settings changes from the network (tested) |
 
 Verified (2026-10-14, macOS 27.0.1 on Apple Silicon, firmware 1510, half-panel YMCKO R3013):

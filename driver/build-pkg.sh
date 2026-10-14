@@ -90,13 +90,18 @@ killall -HUP cupsd 2>/dev/null || true
 # Printer Application を(入れ直したときは止めてから)起動する
 LABEL=jp.yukino.evolis-printer-app
 # ほかの機器と共有するかの設定。無ければ(初めてと v2.0.x から上げたとき)、この Mac からだけ使う設定にする
+# 設定ファイルは、共有しているかどうかを引き継いで、今の版の形に書き直す。
+# no-tls: 暗号化(IPPS)を使わない(_ipp と _ipps の両方で知らせると、印刷ダイアログに同じプリンタが 2 つ出るため)
 CONF="/Library/Application Support/evolis-printer-app.conf"
-if [ ! -f "$CONF" ]; then
-  mkdir -p "/Library/Application Support"
+mkdir -p "/Library/Application Support"
+if [ -f "$CONF" ] && ! grep -qx 'listen-hostname=localhost' "$CONF"; then
+  printf '%s\n' "# evolis-setup --share / --no-share が書き換える(今は、ほかの機器と共有している)" \
+                 "server-options=no-web-interface,no-tls" > "$CONF"
+else
   printf '%s\n' "# evolis-setup --share / --no-share が書き換える(この 2 行があると、この Mac からだけ使える)" \
-                 "listen-hostname=localhost" "server-hostname=localhost" > "$CONF"
-  chmod 644 "$CONF"
+                 "listen-hostname=localhost" "server-hostname=localhost" "server-options=no-tls" > "$CONF"
 fi
+chmod 644 "$CONF"
 mkdir -p /private/var/spool/evolis-printer-app
 # 止めるのは非同期なので、止まりきってから起動する(止まる前に起動すると失敗し、動かないままになる)
 launchctl bootout "system/$LABEL" 2>/dev/null || true
