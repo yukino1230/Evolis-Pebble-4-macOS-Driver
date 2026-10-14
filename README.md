@@ -75,12 +75,12 @@ AirPrint のプリンタとして知らせるので、iPhone・iPad の「プリ
 - この Mac が起きていて、同じネットワークにいる必要がある
 - ネットワークの誰でも刷れる。リボンや濃さなどの設定は、この Mac の Evolis Utility からだけ変えられる
   （ネットワークからの設定の変更は Printer Application が拒む。共有している間は Web の設定画面も止める）
-- iPhone の印刷画面では、用紙サイズは最初から「85.6 × 54mm」になる。選べるのは部数、カラーでプリント、メディアタイプ、プリント品質
+- iPhone・iPad の印刷画面では、用紙サイズは最初から「85.6 × 54mm」になる。選べるのは部数、カラーでプリント、メディアタイプ、プリント品質
 - macOS のファイアウォールがオンでも、「ダウンロードした署名済みソフトウェアを自動的に許可」がオン（既定）なら通る
 - macOS の「プリンタとスキャナ」の「ネットワークでこのプリンタを共有」では、iPhone・iPad には出てこない
   （macOS は共有するプリンタを AirPrint として知らせない）。こちらはオフのままでよい
 
-2026-10-15 に、iPhone から sample-card.pdf を刷って、Mac から刷ったものと同じカードが出ることを確かめた。
+2026-10-15 に、iPhone と iPad から sample-card.pdf を刷って、どちらも Mac から刷ったものと同じカードが出ることを確かめた。
 
 <img src="images/iphone-printers.png" alt="iPhone のプリンタの一覧に出た Evolis Pebble 4" width="250"> <img src="images/iphone-options.png" alt="iPhone の印刷のオプション。用紙は 85.6 × 54mm" width="250">
 

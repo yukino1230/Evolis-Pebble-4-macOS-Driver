@@ -79,12 +79,12 @@ so "Evolis Pebble 4" can be chosen from Print on iPhone and iPad.
 - This Mac must be awake and on the same network
 - Anyone on the network can print. Settings such as the ribbon and densities can only be changed from Evolis Utility on this Mac
   (the Printer Application refuses settings changes from the network, and the web settings page is off while sharing)
-- On iPhone the paper size is "85.6 × 54mm" from the start; the options are copies, print in color, media type and print quality
+- On iPhone and iPad the paper size is "85.6 × 54mm" from the start; the options are copies, print in color, media type and print quality
 - With the macOS firewall on, it still gets through as long as "Automatically allow downloaded signed software" is on (the default)
 - "Share this printer on the network" in macOS Printers & Scanners does not make it appear on iPhone or iPad (macOS does not advertise
   shared printers as AirPrint); leave it off
 
-Tested on 2026-10-15: sample-card.pdf printed from an iPhone came out the same as from the Mac.
+Tested on 2026-10-15: sample-card.pdf printed from an iPhone and from an iPad both came out the same as from the Mac.
 
 <img src="images/iphone-printers.png" alt="Evolis Pebble 4 in the iPhone printer list" width="250"> <img src="images/iphone-options.png" alt="iPhone print options with 85.6 x 54mm paper" width="250">
 
