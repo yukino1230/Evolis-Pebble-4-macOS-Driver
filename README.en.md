@@ -42,7 +42,8 @@ sudo evolis-setup --ribbon k
 Pass the ribbon that is loaded with `--ribbon` (`k` black / `ymckos` half-panel color / `ymcko` full-panel color, etc.;
 see [Ribbon types](#ribbon-types-pr)). When you change the ribbon, change it in the Print settings tab of Evolis Utility (no sudo needed).
 
-In the print dialog, choose the paper size "85.6x54mm.Borderless" (Preview opens with "Other", so choose it every time).
+In the print dialog, choose the paper size "85.6x54mm" under "Loaded Paper" ("85.6x54mm.Borderless" for a queue created with
+`evolis-setup`; Preview opens with "Other", so choose it every time).
 The ribbon and densities do not appear in the print dialog; cards are printed with the values set in Evolis Utility.
 
 | Installed | Location |
@@ -420,7 +421,7 @@ With the PPD driver (`--ppd`):
 ### Paper size in the print dialog
 
 **When printing a PDF from Preview, the print dialog opens with the paper size "Other (210 x 297 mm)". Choose "CR80 card"
-("85.6x54mm.Borderless" with the Printer Application) every time.**
+("85.6x54mm" under "Loaded Paper" with the Printer Application, or "85.6x54mm.Borderless" for a queue created with `evolis-setup`) every time.**
 
 **In Pages and Word, choose printer "Evolis Pebble 4" and paper "CR80 card" in the document's Page Setup**
 (neither print dialog has a paper size field; the document's page setup is used. Confirmed for both).
