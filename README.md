@@ -20,10 +20,10 @@ Evolis は現行の macOS ドライバを Pebble 世代には出していませ�
 > **非公式のドライバです。** Evolis 社とは関係がなく、同社の承認やサポートは受けていません。
 > 使用は自己責任でお願いします（[下記](#無保証自己責任)）。
 
-![v1.1 で刷ったサンプルカード](images/sample-card-color.jpg)
+![v2.0 で刷ったサンプルカード](images/sample-card-v2.jpg)
 
-*v1.1 の印刷ダイアログから、YMCKO ハーフパネルのリボン（R3013）で刷ったサンプルカード（[samples/sample-card.pdf](samples/sample-card.pdf)）のスキャン。
-左側（約 36mm）がカラー、右側は黒パネルの網点で刷られる。*
+*v2.0（Printer Application）でプレビューの印刷ダイアログから、YMCKO ハーフパネルのリボン（R3013）で刷ったサンプルカード
+（[samples/sample-card.pdf](samples/sample-card.pdf)）のスキャン。左側（約 36mm）がカラー、右側は黒パネルの網点で刷られる。*
 
 ## インストール
 
@@ -103,7 +103,7 @@ sudo pkgutil --forget jp.yukino.evolis-pebble4
 今の macOS（27）の「プリンタとスキャナ」には「プリンタユーティリティを開く」が無く（「オプションとサプライ」は
 「一般」と「サプライのレベル」だけ）、そこからは開けない。
 
-<img src="images/utility-ja.png" alt="Evolis Utility の画面" width="600">
+<img src="images/utility-ja.png" alt="Evolis Utility の「プリンタ」タブ" width="420"> <img src="images/utility-ja-settings.png" alt="Evolis Utility の「印刷の設定」タブ" width="420">
 
 - **プリンタ**タブ: 機種、ファームウェア、入れたカードの数、刷ったパネルの数、プリントヘッドのキット番号（`Rkn`）、
   本体に残っている設定（リボンの設定、黒・カラー・オーバーレイの濃さ、カラーの明るさ）。テストカードと技術テストカードを刷る

@@ -15,10 +15,10 @@ not been tested on a printer. The Pebble 4 prints on one side only.
 > **This is an unofficial driver.** It is not affiliated with, endorsed by, or supported by Evolis.
 > Use it at your own risk ([see below](#no-warranty)).
 
-![A sample card printed with v1.1](images/sample-card-color.jpg)
+![A sample card printed with v2.0](images/sample-card-v2.jpg)
 
-*Scan of the sample card ([samples/sample-card.pdf](samples/sample-card.pdf)) printed from the v1.1 print dialog with a
-half-panel YMCKO ribbon (R3013). The left part (about 36 mm) is in color; the right part is printed as a halftone on the black panel.*
+*Scan of the sample card ([samples/sample-card.pdf](samples/sample-card.pdf)) printed with v2.0 (the Printer Application) from Preview's
+print dialog with a half-panel YMCKO ribbon (R3013). The left part (about 36 mm) is in color; the right part is printed as a halftone on the black panel.*
 
 > **From v2.0, the standard setup is a Printer Application.** macOS sees the printer as a driverless printer (IPP Everywhere, the
 > same idea as AirPrint), and the ribbon and densities are set in the Print settings tab of Evolis Utility. CUPS plans to remove
@@ -124,7 +124,7 @@ An app to see the printer's status, change the print settings and call the print
 macOS (27) has no "Open Printer Utility" button in Printers & Scanners ("Options & Supplies" only has General and Supply Levels), so it
 cannot be opened from there.
 
-<img src="images/utility-en.png" alt="Evolis Utility window" width="600">
+<img src="images/utility-en.png" alt="Evolis Utility, Printer tab" width="420"> <img src="images/utility-en-settings.png" alt="Evolis Utility, Print settings tab" width="420">
 
 - **Printer** tab: model, firmware, number of cards inserted, number of panels printed, print head kit number (`Rkn`), and the settings
   stored in the printer (ribbon type, black / color / overlay density, color brightness). Prints a test card or technical test card
