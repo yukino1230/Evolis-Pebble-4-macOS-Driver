@@ -15,8 +15,12 @@ struct EvolisUtilityApp: App {
 
 struct ContentView: View {
     @StateObject private var model = PrinterModel()
+    @StateObject private var settings = PrintSettings()
     @State private var confirm: Action?
     @State private var editingHead = false
+    @State private var tab = Tab.printer
+
+    enum Tab: Hashable { case printer, printing, cleaning }
 
     enum Action: Identifiable {
         case test, technical, clean
@@ -25,30 +29,51 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Form {
-                Section(L("Printer")) {
-                    rows(model.printer)
-                    if !model.printer.isEmpty {
-                        LabeledContent(L("Print head kit number")) {
-                            HStack {
-                                Text(model.headKit).textSelection(.enabled)
-                                Button("Change…") { editingHead = true }
-                                    .disabled(model.working)
+            TabView(selection: $tab) {
+                Form {
+                    Section(L("Printer")) {
+                        rows(model.printer)
+                        if !model.printer.isEmpty {
+                            LabeledContent(L("Print head kit number")) {
+                                HStack {
+                                    Text(model.headKit).textSelection(.enabled)
+                                    Button("Change…") { editingHead = true }
+                                        .disabled(model.working)
+                                }
                             }
                         }
                     }
+                    section(L("Settings stored in the printer"), model.settings)
                 }
-                section(L("Settings stored in the printer"), model.settings)
-                Section {
-                    rows(model.cleaning)
-                } header: {
-                    Text("Cleaning")
-                } footer: {
-                    Text("Cleaning needs a cleaning card. Remove the ribbon before running it.")
-                        .font(.footnote).foregroundStyle(.secondary)
+                .formStyle(.grouped)
+                .tabItem { Text("Printer") }
+                .tag(Tab.printer)
+
+                Form {
+                    if settings.available {
+                        printSettings
+                    } else {
+                        Text("The Printer Application is not installed, or the printer is not registered. Run: sudo evolis-setup")
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                .formStyle(.grouped)
+                .tabItem { Text("Print settings") }
+                .tag(Tab.printing)
+
+                Form {
+                    Section {
+                        rows(model.cleaning)
+                    } footer: {
+                        Text("Cleaning needs a cleaning card. Remove the ribbon before running it.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
+                .formStyle(.grouped)
+                .tabItem { Text("Cleaning") }
+                .tag(Tab.cleaning)
             }
-            .formStyle(.grouped)
+            .padding(.top, 8)
 
             if let message = model.message {
                 HStack(spacing: 8) {
@@ -60,21 +85,23 @@ struct ContentView: View {
             }
 
             HStack {
-                Button("Test card…") { confirm = .test }
-                Button("Technical test card…") { confirm = .technical }
-                Button("Clean…") { confirm = .clean }
-                Spacer()
-                // リボンや濃さは Printer Application(evolis-printer-app)の設定画面で決める
-                Button("Print settings…") {
-                    NSWorkspace.shared.open(URL(string: "http://localhost:8630/Evolis_Pebble_4/printing")!)
+                switch tab {
+                case .printer:
+                    Button("Test card…") { confirm = .test }
+                    Button("Technical test card…") { confirm = .technical }
+                case .cleaning:
+                    Button("Clean…") { confirm = .clean }
+                case .printing:
+                    EmptyView()
                 }
-                Button("Refresh") { model.refresh() }
+                Spacer()
+                Button("Refresh") { model.refresh(); settings.load() }
                     .keyboardShortcut("r")
             }
             .disabled(model.working)
             .padding(20)
         }
-        .onAppear { model.refresh() }
+        .onAppear { model.refresh(); settings.load() }
         .sheet(isPresented: $editingHead) {
             HeadKitView(current: model.headKit) { model.setHeadKit($0) }
         }
@@ -90,6 +117,43 @@ struct ContentView: View {
             Button("Cancel", role: .cancel) {}
         } message: { action in
             Text(detail(action))
+        }
+    }
+
+    /// macOS から刷るときの設定(Printer Application の既定値)。変えるとすぐ保存される
+    private var printSettings: some View {
+        Section {
+            picker(L("Ribbon"), "evolis-ribbon", "k", PrintSettings.ribbons)
+            picker(L("Overlay (protective layer)"), "evolis-overlay", "full", PrintSettings.overlays)
+            picker(L("Black panel rendering"), "evolis-black-mode", "gray", PrintSettings.blackModes)
+            level(L("Black / monochrome ribbon density"), "evolis-black-density")
+            level(L("Color density"), "evolis-color-density")
+            level(L("Color brightness"), "evolis-color-brightness")
+            level(L("Overlay density"), "evolis-overlay-density")
+        } footer: {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Used when printing from macOS. Match the ribbon to the one in the printer. Densities: 0–20, standard 10 (brightness: higher is lighter).")
+                if let error = settings.error { Text(error).foregroundStyle(.red) }
+            }
+            .font(.footnote).foregroundStyle(.secondary)
+        }
+    }
+
+    private func picker(_ title: String, _ attr: String, _ fallback: String, _ choices: [Choice]) -> some View {
+        Picker(title, selection: Binding(get: { settings.value(attr, fallback) },
+                                         set: { settings.set(attr, $0) })) {
+            ForEach(choices) { Text($0.label).tag($0.value) }
+        }
+    }
+
+    private func level(_ title: String, _ attr: String) -> some View {
+        LabeledContent(title) {
+            HStack(spacing: 8) {
+                Text("\(settings.number(attr))").monospacedDigit()
+                Stepper("", value: Binding(get: { settings.number(attr) }, set: { settings.set(attr, String($0)) }),
+                        in: 0...20)
+                    .labelsHidden()
+            }
         }
     }
 

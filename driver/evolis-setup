@@ -89,5 +89,5 @@ for q in $(lpstat -e 2>/dev/null); do
   [ "$q" = "$QUEUE" ] && continue
   lpstat -v "$q" 2>/dev/null | grep -q 'usb://EVOLIS/' || continue
   say "  The PPD queue \"$q\" is still registered. To remove it: sudo evolis-setup --remove --queue $q" \
-      "  PPD のキュー「$q」が残っています。消すときは: sudo evolis-setup --remove --queue $q"
+      "  PPD のキュー「${q}」が残っています。消すときは: sudo evolis-setup --remove --queue $q"
 done
