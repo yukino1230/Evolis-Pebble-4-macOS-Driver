@@ -92,11 +92,18 @@ final class EvolisPrinter {
         catch { throw EvolisError.io(error.localizedDescription) }
     }
 
-    /// コマンドを送って返事を読む。前の返事が残っていることがあるので、先に Rtp で読み捨てる。
+    /// コマンドを送って返事を読む。前の返事が残っていることがあるので、先に別のコマンドの返事で読み捨てる。
     /// 本体が新しい返事を用意する前に読むと Rtp の返事がもう一度返るので、変わるまで読み直す
     func query(_ command: String, timeout: TimeInterval = 4) throws -> String {
-        guard command != "Rtp" else { return try rawQuery(command, timeout: timeout) }
-        let stale = try rawQuery("Rtp", timeout: 2)
+        // 読み捨てる返事が遅れて届くことがあるので、同じ返事が 2 回続くまで繰り返す。
+        // Rtp そのものを読むときは、別のコマンド(Rfv)で読み捨てる(前の返事を Rtp の返事と取り違えないように)
+        let flush = command == "Rtp" ? "Rfv" : "Rtp"
+        var stale = try rawQuery(flush, timeout: 2)
+        for _ in 0..<5 {
+            let again = try rawQuery(flush, timeout: 2)
+            if again == stale { break }
+            stale = again
+        }
         try send(command)
         let deadline = Date().addingTimeInterval(timeout)
         var reply = try read(until: deadline)
