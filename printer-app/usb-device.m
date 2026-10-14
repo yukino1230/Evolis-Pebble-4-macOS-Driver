@@ -43,8 +43,10 @@ static bool usb_list(pappl_device_cb_t cb, void *data, pappl_deverror_cb_t err_c
 static bool usb_open(pappl_device_t *device, const char *uri, const char *name) {
     (void)uri; (void)name;
     @autoreleasepool {
-        // CUPS など、ほかがつかんでいる間は開けない。少し待ってやり直す
-        for (int attempt = 0; attempt < 30; attempt++) {
+        // CUPS や Evolis Utility がつかんでいる間は開けない。少しだけ待ってやり直し、だめなら失敗を返す
+        // (PAPPL はプリンタの鍵を持ったまま開くので、長く待つとその間ほかの問い合わせが止まる。
+        //  失敗すれば PAPPL が 5 秒おきに開き直す)
+        for (int attempt = 0; attempt < 3; attempt++) {
             io_service_t s = find_interface();
             if (!s) { papplDeviceError(device, "Evolis printer not found on USB."); return false; }
             NSError *err = nil;
@@ -52,7 +54,7 @@ static bool usb_open(pappl_device_t *device, const char *uri, const char *name) 
                                                                               queue:nil error:&err interestHandler:nil];
             IOObjectRelease(s);
             if (!intf) {
-                if (err.code == kIOReturnExclusiveAccess) { sleep(2); continue; }
+                if (err.code == kIOReturnExclusiveAccess) { usleep(500000); continue; }
                 papplDeviceError(device, "Unable to open the Evolis printer: %s", err.localizedDescription.UTF8String);
                 return false;
             }

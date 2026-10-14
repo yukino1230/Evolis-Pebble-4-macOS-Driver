@@ -227,9 +227,12 @@ void evolis_job_start(FILE *out, const evolis_options *o) {
     }
 }
 
-void evolis_print_card(FILE *out, const evolis_options *o, evolis_canvas canvas) {
-    static unsigned char y[CARD_H][CARD_W], m[CARD_H][CARD_W], c[CARD_H][CARD_W],
-                         k[CARD_H][CARD_W], ov[CARD_H][CARD_W];
+int evolis_print_card(FILE *out, const evolis_options *o, evolis_canvas canvas) {
+    /* 1 枚ずつ確保する(Printer Application では、別のプリンタのジョブが同時に動くことがある) */
+    unsigned char (*planes)[CARD_H][CARD_W] = malloc(5 * sizeof *planes);
+    if (!planes) return -1;
+    unsigned char (*y)[CARD_W] = planes[0], (*m)[CARD_W] = planes[1], (*c)[CARD_W] = planes[2],
+                  (*k)[CARD_W] = planes[3], (*ov)[CARD_W] = planes[4];
     const struct ribbon *r = &RIBBONS[o->ribbon];
     int levels = o->levels;
 
@@ -258,6 +261,8 @@ void evolis_print_card(FILE *out, const evolis_options *o, evolis_canvas canvas)
     put_panel(out, "k", 2, 1, k);
     if (r->overlay) put_panel(out, "o", 2, 1, ov);
     esc(out, "Se");
+    free(planes);
+    return 0;
 }
 
 void evolis_job_end(FILE *out) {

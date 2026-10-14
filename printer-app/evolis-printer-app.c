@@ -13,6 +13,7 @@
  */
 #include <pappl/pappl.h>
 #include <fcntl.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -55,13 +56,19 @@ typedef struct {
     unsigned char *ras;         /* 今のページのラスタ */
     unsigned       w, h, stride, bpp, cspace;
     int            cards, pages;
+    evolis_canvas *canvas;      /* ジョブごとに持つ(別のプリンタのジョブが同時に動くことがある) */
+    pappl_device_t *device;
+    bool           failed;      /* 書き込みに一度失敗したか */
 } evolis_job_t;
 
-static evolis_canvas canvas;    /* ジョブは 1 つずつ処理されるので共有でよい */
 
-
-static int devwrite(void *device, const char *buf, int len) {
-    return (int)papplDeviceWrite((pappl_device_t *)device, buf, (size_t)len);
+/* FILE からデバイスへの書き込み。一度失敗したら、残りは書かずにすぐ失敗を返す
+   (止まったプリンタに、残りのデータを 1 回ずつ長いタイムアウトで送り続けないように) */
+static int devwrite(void *cookie, const char *buf, int len) {
+    evolis_job_t *ej = cookie;
+    if (ej->failed) return -1;
+    if (papplDeviceWrite(ej->device, buf, (size_t)len) < 0) { ej->failed = true; return -1; }
+    return len;
 }
 
 static bool is_card(pappl_job_t *job, unsigned w, unsigned h, unsigned dpi) {
@@ -99,8 +106,10 @@ static bool rstartjob(pappl_job_t *job, pappl_pr_options_t *options, pappl_devic
         evolis_set_option(&ej->opt, VENDOR[i].key, v ? v : VENDOR[i].def);
     }
     ippDelete(defaults);
-    ej->out = funopen(device, NULL, devwrite, NULL, NULL);
-    if (!ej->out) { free(ej); return false; }
+    ej->device = device;
+    ej->canvas = malloc(sizeof(evolis_canvas));
+    ej->out = ej->canvas ? funopen(ej, NULL, devwrite, NULL, NULL) : NULL;
+    if (!ej->out) { free(ej->canvas); free(ej); return false; }
     papplJobSetData(job, ej);
     papplLogJob(job, PAPPL_LOGLEVEL_INFO, "Ribbon %s, overlay %s, black %s, density black %d color %d overlay %d, brightness %d",
                 evolis_ribbon_name(ej->opt.ribbon), evolis_overlay_name(ej->opt.overlay),
@@ -124,6 +133,13 @@ static bool rstartpage(pappl_job_t *job, pappl_pr_options_t *options, pappl_devi
     papplLogJob(job, PAPPL_LOGLEVEL_DEBUG, "Page %u: %ux%u, %u bits, color space %u, %u bytes per line",
                 page + 1, ej->w, ej->h, ej->bpp, ej->cspace, ej->stride);
     if (!is_card(job, ej->w, ej->h, options->header.HWResolution[0])) return false;
+    /* ヘッダの値をそろって確かめる(食い違ったヘッダで、ラスタの外を読まないように)。
+       カードの大きさは 300dpi で約 1011 x 638 ドット。1 行のバイト数は幅とビット数から決まる */
+    if (ej->w > 1100 || ej->h > 1100 || (uint64_t)ej->stride != ((uint64_t)ej->w * ej->bpp + 7) / 8) {
+        papplLogJob(job, PAPPL_LOGLEVEL_ERROR, "Invalid raster header (%ux%u, %u bits, %u bytes per line).",
+                    ej->w, ej->h, ej->bpp, ej->stride);
+        return false;
+    }
     free(ej->ras);
     ej->ras = malloc((size_t)ej->stride * ej->h);
     if (!ej->ras) return false;
@@ -141,34 +157,41 @@ static bool rwriteline(pappl_job_t *job, pappl_pr_options_t *options, pappl_devi
 
 static bool rendpage(pappl_job_t *job, pappl_pr_options_t *options, pappl_device_t *device, unsigned page) {
     evolis_job_t *ej = papplJobGetData(job);
-    (void)options; (void)device;
+    (void)options;
     ej->pages++;
-    evolis_place(canvas, ej->ras, ej->w, ej->h, ej->stride, ej->bpp, ej->cspace);
+    evolis_place(*ej->canvas, ej->ras, ej->w, ej->h, ej->stride, ej->bpp, ej->cspace);
     /* 真っ白なページは刷らない(白紙のカードを出さない) */
-    if (evolis_canvas_blank(canvas)) {
+    if (evolis_canvas_blank(*ej->canvas)) {
         papplLogJob(job, PAPPL_LOGLEVEL_WARN, "Page %u is blank and is not printed.", page + 1);
         return true;
     }
     if (ej->cards == 0) evolis_job_start(ej->out, &ej->opt);
-    evolis_print_card(ej->out, &ej->opt, canvas);
+    if (evolis_print_card(ej->out, &ej->opt, *ej->canvas) < 0) return false;
+    /* PAPPL はデバイスへの書き込みをためるので、カードごとに送り切る(最後の Se が残ると刷られない) */
     fflush(ej->out);
+    papplDeviceFlush(device);
     ej->cards++;
     papplLogJob(job, PAPPL_LOGLEVEL_INFO, "Card %d: %ux%u dots, %u bits", ej->cards, ej->w, ej->h, ej->bpp);
-    return !ferror(ej->out);
+    return !ferror(ej->out) && !ej->failed;
 }
 
 static bool rendjob(pappl_job_t *job, pappl_pr_options_t *options, pappl_device_t *device) {
     evolis_job_t *ej = papplJobGetData(job);
     bool ok = true;
-    (void)options; (void)device;
-    if (ej->cards) evolis_job_end(ej->out);
+    (void)options;
+    if (!ej) return false;                     /* PAPPL が失敗のあとにもう一度呼ぶことがある */
+    if (ej->cards) {
+        evolis_job_end(ej->out);
+        papplDeviceFlush(device);
+    }
     else if (ej->pages) {
         papplLogJob(job, PAPPL_LOGLEVEL_ERROR, "Nothing to print (all pages are blank).");
         ok = false;
     }
-    ok = ok && !ferror(ej->out);
+    ok = ok && !ferror(ej->out) && !ej->failed;
     fclose(ej->out);
     free(ej->ras);
+    free(ej->canvas);
     free(ej);
     papplJobSetData(job, NULL);
     return ok;
@@ -184,6 +207,7 @@ static bool printfile(pappl_job_t *job, pappl_pr_options_t *options, pappl_devic
     while ((n = read(fd, buf, sizeof buf)) > 0)
         if (papplDeviceWrite(device, buf, (size_t)n) < 0) { close(fd); return false; }
     close(fd);
+    papplDeviceFlush(device);                  /* ためずに送り切る */
     return n == 0;
 }
 

@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stdint.h>
 
 #include "evolis_card.h"
 
@@ -55,28 +56,27 @@ static int unrle(unsigned char *out, unsigned stride, unsigned height, unsigned 
         unsigned rep = (unsigned)c + 1, len = 0;
         while (len < stride) {
             int n = fgetc(in);
-            if (n == EOF) break;
+            if (n == EOF) { free(line); return -1; }
             if (apple && n == 128) {
                 while (len < stride) line[len++] = 0xff;
             } else if (n < 128) {
                 unsigned char pix[8];
-                if (readn(pix, px) != px) break;
+                if (readn(pix, px) != px) { free(line); return -1; }
                 for (int i = 0; i <= n && len < stride; i++)
                     for (unsigned k = 0; k < px && len < stride; k++) line[len++] = pix[k];
             } else {
                 unsigned cnt = (257 - (unsigned)n) * px;
                 for (unsigned k = 0; k < cnt && len < stride; k++) {
-                    int b = fgetc(in); if (b == EOF) break;
+                    int b = fgetc(in); if (b == EOF) { free(line); return -1; }
                     line[len++] = (unsigned char)b;
                 }
             }
         }
-        while (len < stride) line[len++] = 0;
         for (unsigned r = 0; r < rep && y < height; r++, y++)
             memcpy(out + (size_t)y * stride, line, stride);
     }
     free(line);
-    return 0;
+    return y == height ? 0 : -1;                         /* 途中で終わった */
 }
 
 static evolis_options opt;
@@ -136,7 +136,7 @@ int main(int argc, char **argv) {
             w      = rd32(hdr + 12);
             h      = rd32(hdr + 16);
             hdpi   = vdpi = rd32(hdr + 20);
-            stride = w * bpp / 8;
+            stride = (unsigned)(((uint64_t)w * bpp + 7) / 8 > UINT32_MAX ? 0 : ((uint64_t)w * bpp + 7) / 8);
             cspace = bpp == 8 ? 18 : 19;
         } else {
             if (readn(hdr, HDRSIZE) != HDRSIZE) break;
@@ -169,10 +169,21 @@ int main(int argc, char **argv) {
                 return 1;
             }
         }
+        /* ヘッダの値をそろって確かめる(食い違ったヘッダで、ラスタの外を読まないように)。
+           カードの大きさは 300dpi で約 1011 x 638 ドット。1 行のバイト数は幅とビット数から決まる */
+        if (w > 1100 || h > 1100 || (uint64_t)stride != ((uint64_t)w * bpp + 7) / 8) {
+            logmsg("ERROR", T("Invalid raster header (%ux%u, %u bits, %u bytes per line)",
+                              "ラスタヘッダが不正です (%ux%u、%ubit、1 行 %u バイト)"), w, h, bpp, stride);
+            return 1;
+        }
         ras = calloc((size_t)stride * h, 1);
         if (!ras) { logmsg("ERROR", T("Out of memory", "メモリ不足")); return 1; }
-        if (compressed) unrle(ras, stride, h, bpp);
-        else            readn(ras, (size_t)stride * h);
+        /* 途中で切れたページは刷らない(足りないところが黒く刷られてしまう) */
+        if (compressed ? unrle(ras, stride, h, bpp) != 0 : readn(ras, (size_t)stride * h) != (size_t)stride * h) {
+            logmsg("ERROR", T("The page data ended early (page %d)", "ページ%d のデータが途中で切れています"), npages + 1);
+            free(ras);
+            return 1;
+        }
 
         evolis_place(canvas, ras, w, h, stride, bpp, cspace);
         free(ras);
@@ -187,7 +198,7 @@ int main(int argc, char **argv) {
         }
 
         if (pages == 0) evolis_job_start(stdout, &opt);
-        evolis_print_card(stdout, &opt, canvas);
+        if (evolis_print_card(stdout, &opt, canvas) < 0) { logmsg("ERROR", T("Out of memory", "メモリ不足")); return 1; }
         logmsg("INFO", T("Card %d: %ux%u dots %ubit ribbon %s density black %d color %d brightness %d black panel %s",
                          "カード%d: %ux%u ドット %ubit リボン %s コントラスト 黒%d カラー%d 明るさ%d 黒の処理 %s"),
                pages + 1, w, h, bpp, evolis_ribbon_name(opt.ribbon), opt.contrast_k, opt.contrast_color,

@@ -51,7 +51,8 @@ int evolis_canvas_blank(evolis_canvas canvas);
 
 /* リボンの種類と濃さを本体に設定する(本体に残るので、標準の値でも毎回送る) */
 void evolis_job_start(FILE *out, const evolis_options *o);
-void evolis_print_card(FILE *out, const evolis_options *o, evolis_canvas canvas);
+/* カード 1 枚分のコマンドを書く。メモリが足りないときは -1 */
+int evolis_print_card(FILE *out, const evolis_options *o, evolis_canvas canvas);
 void evolis_job_end(FILE *out);
 
 #endif
