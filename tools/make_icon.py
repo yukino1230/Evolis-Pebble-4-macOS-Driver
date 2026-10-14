@@ -3,6 +3,8 @@
 
   python3 tools/make_icon.py app/Resources/AppIcon.icns
   python3 tools/make_icon.py icon.png        # 確かめる用
+  python3 tools/make_icon.py --printer printer-app/printer-icon.png
+                                             # プリンタのアイコン(歯車なし、512 px)。Printer Application が使う
 
 Evolis のロゴは使わない(商標)。1024 px で描いて、iconutil で .icns にまとめる。
 """
@@ -22,7 +24,7 @@ def s(*v):
     return [round(x * SS) for x in v]
 
 
-def draw():
+def draw(with_gear=True):
     big = N * SS
     img = Image.new("RGBA", (big, big), (0, 0, 0, 0))
 
@@ -80,12 +82,15 @@ def draw():
     # 前面のパネルと状態のランプ
     d.rounded_rectangle(s(body[0] + 56, body[1] + 120, body[2] - 56, body[1] + 140), radius=10 * SS,
                         fill=(214, 220, 230, 255))
-    d.ellipse(s(body[0] + 290, body[3] - 104, body[0] + 326, body[3] - 68), fill=(34, 197, 94, 255))
+    # 状態のランプ。歯車を付けるときは歯車に隠れないよう左に寄せる
+    lamp = body[0] + 290 if with_gear else body[2] - 128
+    d.ellipse(s(lamp, body[3] - 104, lamp + 36, body[3] - 68), fill=(34, 197, 94, 255))
     d.rounded_rectangle(s(body[0] + 64, body[3] - 96, body[0] + 260, body[3] - 76), radius=10 * SS,
                         fill=(214, 220, 230, 255))
 
-    # 右下に歯車(設定や状態を見るアプリだとわかるように)
-    gear(img, 716, 716, 150)
+    # 右下に歯車(設定や状態を見るアプリだとわかるように)。プリンタのアイコンには付けない
+    if with_gear:
+        gear(img, 716, 716, 150)
 
     return img.resize((N, N), Image.LANCZOS)
 
@@ -127,8 +132,15 @@ def gear(img, cx, cy, r, teeth=8):
 
 
 def main():
-    out = sys.argv[1] if len(sys.argv) > 1 else "AppIcon.icns"
-    icon = draw()
+    args = sys.argv[1:]
+    printer = "--printer" in args
+    args = [a for a in args if a != "--printer"]
+    out = args[0] if args else "AppIcon.icns"
+    icon = draw(with_gear=not printer)
+    if printer:
+        icon.resize((512, 512), Image.LANCZOS).save(out, optimize=True)
+        print(out)
+        return
     if out.endswith(".png"):                  # 確かめる用に PNG でも出せる
         icon.save(out)
         print(out)
