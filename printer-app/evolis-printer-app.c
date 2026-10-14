@@ -20,6 +20,7 @@
 #include "../driver/evolis_card.h"
 #include "usb-device.h"
 #include "evolis-strings.h"     /* printer-app/mkstrings.py が作る */
+#include "evolis-icons.h"       /* printer-app/build.sh が作る */
 
 #ifndef EVOLIS_VERSION
 #  define EVOLIS_VERSION "2.0"
@@ -210,6 +211,10 @@ static bool driver_cb(pappl_system_t *system, const char *driver_name, const cha
     d->format        = "application/vnd.evolis";
     papplCopyString(d->make_and_model, "Evolis Pebble 4", sizeof d->make_and_model);
     d->ppm = d->ppm_color = 1;
+    /* アイコン(小 / 中 / 大)。無いと PAPPL の標準のアイコンになる */
+    d->icons[0].data = ICON_48;  d->icons[0].datalen = sizeof ICON_48;
+    d->icons[1].data = ICON_128; d->icons[1].datalen = sizeof ICON_128;
+    d->icons[2].data = ICON_512; d->icons[2].datalen = sizeof ICON_512;
     d->kind = PAPPL_KIND_DOCUMENT;
     d->orient_default = IPP_ORIENT_NONE;
     d->quality_default = IPP_QUALITY_NORMAL;

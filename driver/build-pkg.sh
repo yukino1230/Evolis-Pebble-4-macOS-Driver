@@ -22,7 +22,7 @@ NOTARY="${EVOLIS_NOTARY:-}"
 
 rm -rf "$BUILD"; mkdir -p "$ROOT" "$BUILD/scripts"
 mkdir -p "$ROOT/usr/local/libexec/cups/filter" "$ROOT/usr/local/bin" "$ROOT/usr/local/share/evolis" \
-         "$ROOT/Library/Printers/PPDs/Contents/Resources" "$ROOT/Applications" \
+         "$ROOT/Applications" \
          "$ROOT/usr/local/libexec/evolis" "$ROOT/Library/LaunchDaemons"
 
 echo "==> CUPS フィルタをビルド(ユニバーサル)"
@@ -67,9 +67,8 @@ if [ -n "$PROBLEMS" ]; then
   echo "$PROBLEMS"; echo "PPD に問題があります"; exit 1
 fi
 install -m 644 "$BUILD/Pebble4.ppd" "$ROOT/usr/local/share/evolis/Pebble4.ppd"
-# 「設定」>「プリンタとスキャナ」で追加するときに macOS が見つける場所
-gzip -c "$BUILD/Pebble4.ppd" > "$ROOT/Library/Printers/PPDs/Contents/Resources/EvolisPebble4.ppd.gz"
-chmod 644 "$ROOT/Library/Printers/PPDs/Contents/Resources/EvolisPebble4.ppd.gz"
+# PPD は /Library/Printers/PPDs には入れない(--ppd のときだけ使う)。システム設定でプリンタを追加するときは、
+# Bonjour の Evolis Pebble 4(Printer Application)を選んでもらい、PPD と取り違えないようにする
 
 echo "==> キュー登録コマンドと本体の機能を呼ぶコマンドを配置"
 install -m 755 "$HERE/evolis-setup" "$ROOT/usr/local/bin/evolis-setup"
@@ -84,7 +83,9 @@ find "$ROOT" -name '._*' -delete
 
 cat > "$BUILD/scripts/postinstall" <<'EOS'
 #!/bin/bash
-# CUPS に新しい PPD を認識させる
+# v2.0 までが入れた PPD を消す(システム設定でプリンタを追加するときに取り違えないように)。
+# 中身が変わったことを CUPS に知らせる
+rm -f /Library/Printers/PPDs/Contents/Resources/EvolisPebble4.ppd.gz
 killall -HUP cupsd 2>/dev/null || true
 # Printer Application を(入れ直したときは止めてから)起動する
 LABEL=jp.yukino.evolis-printer-app

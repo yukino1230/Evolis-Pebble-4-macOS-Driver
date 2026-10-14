@@ -12,6 +12,19 @@ OUT="${2:-$ROOT/build/printer-app}"
 mkdir -p "$OUT"
 # Web の設定画面の英語と日本語(PPD と同じ表示名)
 python3 "$HERE/mkstrings.py" > "$OUT/evolis-strings.h"
+# プリンタのアイコン(Evolis Utility と同じ絵)。macOS の「プリンタとスキャナ」などに出る。48 / 128 / 512 px
+for size in 48 128 512; do
+  sips -s format png -z $size $size "$ROOT/app/Resources/AppIcon.icns" --out "$OUT/icon-$size.png" >/dev/null
+done
+python3 - "$OUT" > "$OUT/evolis-icons.h" <<'PY'
+import sys
+out = sys.argv[1]
+print("/* printer-app/build.sh が app/Resources/AppIcon.icns から作る。手で直さない */")
+for size in (48, 128, 512):
+    data = open(f"{out}/icon-{size}.png", "rb").read()
+    body = ",".join(str(b) for b in data)
+    print(f"static const unsigned char ICON_{size}[] = {{{body}}};")
+PY
 clang -O2 -Wall -fobjc-arc -arch arm64 -arch x86_64 -mmacosx-version-min=13.0 \
       -DEVOLIS_VERSION="\"$VER\"" -I"$DEPS/include" -I"$OUT" \
       -o "$OUT/evolis-printer-app" \

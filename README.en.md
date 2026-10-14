@@ -52,8 +52,14 @@ The ribbon and densities do not appear in the print dialog; cards are printed wi
 | Queue setup command | `/usr/local/bin/evolis-setup` |
 | Printer function command | `/usr/local/bin/evolis-tool` (test card, technical test card, cleaning) |
 | Utility app | `/Applications/Evolis Utility.app` (printer status, print settings, test cards, cleaning) |
-| CUPS filter and PPD (used with `--ppd`) | `/usr/local/libexec/cups/filter/rastertoevolis`, `/Library/Printers/PPDs/Contents/Resources/EvolisPebble4.ppd.gz`, `/usr/local/share/evolis/Pebble4.ppd` |
+| CUPS filter and PPD (used with `--ppd`) | `/usr/local/libexec/cups/filter/rastertoevolis`, `/usr/local/share/evolis/Pebble4.ppd` |
 | Licenses of the bundled libraries | `/usr/local/share/evolis/licenses` |
+
+**You can also add the printer without the Terminal.** In System Settings → Printers & Scanners → Add Printer, choose
+"Evolis Pebble 4" of kind "Bonjour" (the Printer Application). The driver field shows the printer's name (Evolis Pebble 4), a driver macOS
+builds by querying the printer; once added, the kind shows as "Evolis Pebble 4-AirPrint". Set the ribbon in the Print settings tab of
+Evolis Utility. "EVOLIS Pebble" of kind "USB" is the printer itself seen directly and cannot print
+(from v2.0.1 the PPD is no longer installed in `/Library/Printers/PPDs`; it is only used with `--ppd`).
 
 The Printer Application runs as root and listens only on this Mac (localhost); other devices on the network cannot see it.
 The printer and its settings are kept in `/private/var/lib/evolis-printer-app.state`, and the log in
@@ -78,15 +84,8 @@ sudo evolis-setup --ppd --ribbon k
 
 The ribbon and densities can then be chosen in the print dialog ([Print dialog options](#print-dialog-options)). When you change the
 ribbon, change the default with `sudo lpadmin -p Evolis_Pebble_4 -o EvolisRibbon=<type>`.
-The PPD carries the printer's device ID (`MFG:EVOLIS;MDL:Pebble`), so in System Settings → Printers & Scanners → Add Printer,
-choosing "EVOLIS Pebble" (kind: USB) also selects the "Evolis Pebble 4" driver automatically (the queue is named `EVOLIS_Pebble`).
-Two things differ from `evolis-setup`:
-
-- If the USB backend fails (for example, the printer is switched off in the middle of a job), the whole queue is paused until
-  you press Resume in the queue window (CUPS default `printer-error-policy=stop-printer`). To cancel just that job instead,
-  run `sudo lpadmin -p EVOLIS_Pebble -o printer-error-policy=abort-job`. Jobs stopped by the driver (filter) itself, such as a
-  wrong paper size, only stop that job regardless of this setting.
-- The default ribbon is black (`k`). For a color ribbon run `sudo lpadmin -p EVOLIS_Pebble -o EvolisRibbon=ymckos` or pick it in the print dialog.
+If the USB backend fails (for example, the printer is switched off in the middle of a job), only that job is cancelled instead of pausing
+the whole queue (`printer-error-policy=abort-job`). Jobs stopped by the driver (filter) itself, such as a wrong paper size, also stop only that job.
 
 ### Uninstall
 

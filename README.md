@@ -49,8 +49,14 @@ sudo evolis-setup --ribbon k
 | キューの登録コマンド | `/usr/local/bin/evolis-setup` |
 | 本体の機能を呼ぶコマンド | `/usr/local/bin/evolis-tool`（テストカード、技術テストカード、クリーニング） |
 | ユーティリティ | `/Applications/Evolis Utility.app`（プリンタの状態、印刷の設定、テストカード、クリーニング） |
-| CUPS フィルタと PPD（`--ppd` のとき使う） | `/usr/local/libexec/cups/filter/rastertoevolis`、`/Library/Printers/PPDs/Contents/Resources/EvolisPebble4.ppd.gz`、`/usr/local/share/evolis/Pebble4.ppd` |
+| CUPS フィルタと PPD（`--ppd` のとき使う） | `/usr/local/libexec/cups/filter/rastertoevolis`、`/usr/local/share/evolis/Pebble4.ppd` |
 | 組み込んだライブラリのライセンス | `/usr/local/share/evolis/licenses` |
+
+**ターミナルを使わずに登録することもできる。** 「設定」→「プリンタとスキャナ」→「プリンタを追加」で、種類が「Bonjour」の
+「Evolis Pebble 4」（Printer Application）を選ぶ。ドライバ欄にはプリンタの名前（Evolis Pebble 4）が出る（macOS がプリンタに問い合わせて作るドライバ）。
+追加すると、種類は「Evolis Pebble 4-AirPrint」になる。リボンは Evolis Utility の「印刷の設定」タブで合わせる。
+種類が「USB」の「EVOLIS Pebble」はプリンタ本体がそのまま見えているもので、選んでも刷れない
+（PPD は v2.0.1 から `/Library/Printers/PPDs` に入れていない。`--ppd` のときだけ使う）。
 
 Printer Application は root で動き、この Mac の中（localhost）でだけ待ち受ける。ネットワークのほかの機器からは見えない。
 プリンタと設定は `/private/var/lib/evolis-printer-app.state`、ログは `/Library/Logs/evolis-printer-app.log`（`sudo` で読む）に残る。
@@ -73,15 +79,8 @@ sudo evolis-setup --ppd --ribbon k
 ```
 
 印刷ダイアログでリボンや濃さを選べる。付け替えたら `sudo lpadmin -p Evolis_Pebble_4 -o EvolisRibbon=<種類>` で既定を変える。
-PPD にプリンタの ID（`MFG:EVOLIS;MDL:Pebble`）を書いてあるので、「設定」→「プリンタとスキャナ」→「プリンタを追加」で
-「EVOLIS Pebble」（種類 USB）を選んでも、ドライバに「Evolis Pebble 4」が自動で選ばれる（キュー名は `EVOLIS_Pebble`）。
-ただし、この方法では次の 2 点が `evolis-setup` と違う:
-
-- USB の送信処理が失敗したとき（ジョブの途中でプリンタの電源を切ったときなど）、キュー全体が一時停止し、キューの画面で
-  「再開」を押すまで次のジョブが刷られない（CUPS の既定 `printer-error-policy=stop-printer`）。そのジョブだけ取り消すには
-  `sudo lpadmin -p EVOLIS_Pebble -o printer-error-policy=abort-job`。用紙サイズの選び忘れなど、ドライバ（フィルタ）が
-  止めたジョブはこの設定と関係なく、そのジョブだけが止まる
-- 既定のリボンは黒（`k`）。カラーリボンなら `sudo lpadmin -p EVOLIS_Pebble -o EvolisRibbon=ymckos` などで変えるか、印刷ダイアログで選ぶ
+USB の送信処理が失敗したとき（ジョブの途中でプリンタの電源を切ったときなど）は、キュー全体を止めずにそのジョブだけ取り消す
+（`printer-error-policy=abort-job`）。用紙サイズの選び忘れなど、ドライバ（フィルタ）が止めたジョブも、そのジョブだけが止まる。
 
 ### アンインストール
 
