@@ -589,8 +589,16 @@ Verified (2026-10-14, without the printer, by having the print data written to f
   so it is advertised as landscape, like the PPD
 - `ippeveprinter` takes one job at a time (it answers "busy" to the next one, and macOS waits and resends)
 
-Not yet verified: sending to the real printer over USB, printing from a print dialog such as Preview's, and starting automatically at
-login (launchd). Also, `ippeveprinter` ships with CUPS 2.x and may go away together with PPDs; then the same thing would be built with
+Verified on the printer (2026-10-14, firmware 1510, YMCKO half-panel R3013):
+
+- sample-card.pdf sent with `lp` went over USB through `evolis-usb-send`, and the card came out correctly
+- Printing from Preview's print dialog works too. As with the PPD driver, the paper size opens as "Other (A4)", so pick
+  "85.6x54mm.Borderless". The only options are color mode and print quality (the ribbon and the rest are set when starting the server)
+- At first, print dialog jobs stopped with "the printer cannot print with the specified options": the dialog sends the paper as a size,
+  and `media-size-supported` was missing. Adding it fixed this (`tests/ipp.sh` checks it without printing)
+
+Not yet verified: starting automatically at login (launchd), and other ribbons such as full-panel YMCKO or black.
+Also, `ippeveprinter` ships with CUPS 2.x and may go away together with PPDs; then the same thing would be built with
 PAPPL or similar (the shape, where `evolis-ipp-print` hands the received raster to `rastertoevolis`, stays the same).
 
 ## References and their licenses

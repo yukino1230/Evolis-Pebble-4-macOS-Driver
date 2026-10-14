@@ -1,0 +1,22 @@
+# 印刷ダイアログと同じ形(用紙を media-col の大きさで指定)のジョブを受け付けるかを確かめる。カードは刷らない。
+# tests/ipp.sh から使う
+{
+  NAME "Validate-Job with media-col (like the macOS print dialog)"
+  OPERATION Validate-Job
+  GROUP operation-attributes-tag
+  ATTR charset attributes-charset utf-8
+  ATTR naturalLanguage attributes-natural-language en
+  ATTR uri printer-uri $uri
+  ATTR name requesting-user-name test
+  ATTR mimeMediaType document-format image/urf
+  GROUP job-attributes-tag
+  ATTR collection media-col {
+    MEMBER collection media-size { MEMBER integer x-dimension 8560 MEMBER integer y-dimension 5400 }
+    MEMBER integer media-top-margin 0
+    MEMBER integer media-bottom-margin 0
+    MEMBER integer media-left-margin 0
+    MEMBER integer media-right-margin 0
+  }
+  ATTR keyword sides one-sided
+  STATUS successful-ok
+}

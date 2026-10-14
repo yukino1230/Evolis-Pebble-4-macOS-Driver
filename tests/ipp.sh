@@ -20,8 +20,12 @@ for _ in $(seq 1 60); do
   sleep 1
 done
 
-expected() { awk -v n="$1" '$1 == n { sub("exit=", "", $2); print $3 }' "$HERE/expected.txt"; }
+# 印刷ダイアログは用紙を media-col の大きさで送る。それを受け付けるか(Validate-Job なので刷らない)
 FAIL=0
+if ipptool -q "ipp://localhost:$PORT/ipp/print" "$HERE/validate-job.test"; then echo "OK   validate-job (media-col)"
+else echo "FAIL validate-job (media-col)"; FAIL=1; fi
+
+expected() { awk -v n="$1" '$1 == n { sub("exit=", "", $2); print $3 }' "$HERE/expected.txt"; }
 n=0
 # 名前 | 送るラスタ | 形式 | 比べる記録(ymckos で刷った tests/run.sh の結果)
 while read -r name file type want; do
