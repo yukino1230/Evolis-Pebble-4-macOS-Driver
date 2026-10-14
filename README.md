@@ -8,92 +8,144 @@ Evolis は現行の macOS ドライバを Pebble 世代には出していませ�
 > Driving the Evolis Pebble 4 ID card printer from macOS. Evolis ships no current macOS driver for
 > this generation, but the printer's command set is documented and the transport is USB printer class.
 
-**macOS の印刷ダイアログから印刷できます（2026-10-13、macOS 27.0.1 / Apple Silicon で確認）。** 黒（K）リボンと、カラー（YMCKO）リボンのハーフパネル（R3013）で実機確認済みです。ほかのリボン（全面パネルの YMCKO、KO、白・金などの単色）は設定を用意してありますが、実機では試していません。Pebble 4 は片面専用の機種です。
+> **v2.1 から、iPhone・iPad・ほかの Mac からも刷れる（AirPrint）。**
+> v2.0 から、プリンタは「ドライバ無しのプリンタ」（AirPrint と同じ仕組み）として macOS に見え、
+> リボンや濃さは Evolis Utility で選ぶ。v1 の PPD のドライバも残してある（[ターミナルで使う](#ターミナルで使う)）。
 
-> **v2.0 から、標準の入れ方が Printer Application になった。** プリンタは「ドライバ無しのプリンタ」（IPP Everywhere、AirPrint と同じ仕組み）として
-> macOS に見え、リボンや濃さは Evolis Utility の「印刷の設定」タブで選ぶ。CUPS の PPD を使うドライバは将来の CUPS で廃止される予定なので、
-> その後も使えるようにした（[Printer Application](#printer-applicationv20-から標準)）。v1 の PPD のドライバも残してあり、`--ppd` で使える。
-
-> **v2.1 から、iPhone・iPad・ほかの Mac からも刷れる（AirPrint）。** Evolis Utility で共有をオンにする
-> （[iPhone・iPad・ほかの Mac から印刷する](#iphoneipadほかの-mac-から印刷するv21-から)）。
-
-> **表示は英語と日本語**（v1.2 から）。印刷ダイアログの項目、Evolis Utility、コマンド、キューに出るメッセージは、
-> macOS の言語設定に合わせて英語か日本語になる（v1.1 までは日本語だけ）。
+> **表示は英語と日本語。** Evolis Utility やメッセージは、macOS の言語設定に合わせて英語か日本語になる。
 
 > **非公式のドライバです。** Evolis 社とは関係がなく、同社の承認やサポートは受けていません。
 > 使用は自己責任でお願いします（[下記](#無保証自己責任)）。
 
 ![v2.0 で刷ったサンプルカード](images/sample-card-v2.jpg)
 
-*v2.0（Printer Application）でプレビューの印刷ダイアログから、YMCKO ハーフパネルのリボン（R3013）で刷ったサンプルカード
+*v2.0 でプレビューの印刷ダイアログから、YMCKO ハーフパネルのリボン（R3013）で刷ったサンプルカード
 （[samples/sample-card.pdf](samples/sample-card.pdf)）のスキャン。左側（約 36mm）がカラー、右側は黒パネルの網点で刷られる。*
 
 ## インストール
 
-[Releases](https://github.com/yukino1230/Evolis-Pebble-4-macOS-Driver/releases/latest) から
-`evolis-pebble4-<版>.pkg` をダウンロードして、ダブルクリックで入れる（Developer ID で署名し、Apple の公証を通してある）。
-入れると Printer Application（`evolis-printer-app`）が動き出す（Mac を起動したときも自動で動く）。
-そのあと、プリンタを USB でつないで電源を入れ、キューを登録する。
+ターミナルは使わなくてよい。
 
-```bash
-sudo evolis-setup --ribbon k
-```
+1. [Releases](https://github.com/yukino1230/Evolis-Pebble-4-macOS-Driver/releases/latest) から `evolis-pebble4-<版>.pkg` を
+   ダウンロードして、ダブルクリックで入れる（Developer ID で署名し、Apple の公証を通してある）
+2. プリンタを USB でつないで、電源を入れる
+3. 「システム設定」→「プリンタとスキャナ」→「プリンタを追加」を開き、種類が「**Bonjour**」の「**Evolis Pebble 4**」を選んで「追加」を押す。
+   ドライバ欄にはプリンタの名前（Evolis Pebble 4）が出る。追加すると、種類は「Evolis Pebble 4-AirPrint」になる。
+   種類が「USB」の「EVOLIS Pebble」は選ばない（プリンタ本体がそのまま見えているもので、選んでも刷れない）
+4. アプリケーションフォルダの **Evolis Utility** を開き、「印刷の設定」タブで、付いているリボンを選ぶ
+   （[リボンの種類](#リボンの種類pr)。違うリボンを選ぶと、カードが詰まったりリボンが切れたりする）
+5. あとはふつうに刷る（[印刷のしかた](#印刷のしかた)）
 
-`--ribbon` には、付いているリボンを指定する（`k` 黒 / `ymckos` ハーフパネルのカラー / `ymcko` 全面パネルのカラーなど。
-[リボンの種類](#リボンの種類pr)を参照）。付け替えたら、Evolis Utility の「印刷の設定」タブで変える（sudo は要らない）。
+Pebble 4 は片面専用の機種。黒（K）リボンと、カラー（YMCKO）リボンのハーフパネル（R3013）で実機確認済み。
+ほかのリボン（全面パネルの YMCKO、KO、白・金などの単色）は設定を用意してあるが、実機では試していない。
+macOS 27 / Apple Silicon で確かめた（Intel の Mac にも入るが、試していない）。
 
-印刷ダイアログでは、用紙サイズに「積載用紙」の「85.6x54mm」を選ぶ（`evolis-setup` で登録したキューでは「85.6x54mm.Borderless」。
-プレビューは「その他」で開くので、毎回選ぶ）。
-リボンや濃さは印刷ダイアログには出ない（Evolis Utility で決めた値で刷られる）。
+## 使い方
 
-| 入るもの | 場所 |
-|---|---|
-| Printer Application（Intel / Apple Silicon 両対応） | `/usr/local/libexec/evolis/evolis-printer-app`（`/usr/local/bin/evolis-printer-app` からも呼べる） |
-| 自動で起動する設定 | `/Library/LaunchDaemons/jp.yukino.evolis-printer-app.plist` |
-| 共有するかの設定 | `/Library/Application Support/evolis-printer-app.conf`（`evolis-setup --share` / `--no-share` が書き換える） |
-| キューの登録コマンド | `/usr/local/bin/evolis-setup` |
-| 本体の機能を呼ぶコマンド | `/usr/local/bin/evolis-tool`（テストカード、技術テストカード、クリーニング） |
-| ユーティリティ | `/Applications/Evolis Utility.app`（プリンタの状態、印刷の設定、テストカード、クリーニング） |
-| CUPS フィルタと PPD（`--ppd` のとき使う） | `/usr/local/libexec/cups/filter/rastertoevolis`、`/usr/local/share/evolis/Pebble4.ppd` |
-| 組み込んだライブラリのライセンス | `/usr/local/share/evolis/licenses` |
+### 印刷のしかた
 
-**ターミナルを使わずに登録することもできる。** 「設定」→「プリンタとスキャナ」→「プリンタを追加」で、種類が「Bonjour」の
-「Evolis Pebble 4」（Printer Application）を選ぶ。ドライバ欄にはプリンタの名前（Evolis Pebble 4）が出る（macOS がプリンタに問い合わせて作るドライバ）。
-追加すると、種類は「Evolis Pebble 4-AirPrint」になる。リボンは Evolis Utility の「印刷の設定」タブで合わせる。
-種類が「USB」の「EVOLIS Pebble」はプリンタ本体がそのまま見えているもので、選んでも刷れない
-（PPD は v2.0.1 から `/Library/Printers/PPDs` に入れていない。`--ppd` のときだけ使う）。
+カードの大きさ（85.6 × 54mm、横長）で作った PDF や画像を、ふつうに印刷する。カードの全面に縁なしで刷られる。
 
-Printer Application は root で動き、この Mac の中（localhost）でだけ待ち受ける。ネットワークのほかの機器からは見えない。
-プリンタと設定は `/private/var/lib/evolis-printer-app.state`、ログは `/Library/Logs/evolis-printer-app.log`（`sudo` で読む）に残る。
+- **プレビュー**：印刷ダイアログの用紙サイズが「その他（210 x 297 mm）」で開くので、毎回「積載用紙」の「**85.6x54mm**」を選ぶ
+  （ターミナルの `evolis-setup` で登録したプリンタでは「85.6x54mm.Borderless」）。選び忘れると、刷らずにジョブが止まる
+- **Pages・Word**：書類の「ページ設定」で、プリンタ「Evolis Pebble 4」と用紙 85.6 × 54mm を選んでおけば、そのまま刷れる
+- 印刷ダイアログで選べるのは、部数、カラー / 白黒、品質など。リボンや濃さは Evolis Utility で決める
+
+### Evolis Utility
+
+プリンタの状態を見たり、印刷の設定を変えたり、本体の機能を呼んだりするアプリ。アプリケーションフォルダ（または Launchpad、Spotlight）から開く。
+
+<img src="images/utility-ja.png" alt="Evolis Utility の「プリンタ」タブ" width="420"> <img src="images/utility-ja-settings.png" alt="Evolis Utility の「印刷の設定」タブ" width="420">
+
+- **プリンタ**タブ：機種、ファームウェア、入れたカードの数、刷ったパネルの数、プリントヘッドのキット番号と、本体に残っている設定。
+  「テストカード」「技術テストカード」で、プリンタが持っているテスト用のカードを刷る（カードを 1 枚使う）
+- **印刷の設定**タブ：刷るときのリボン、オーバーレイ（保護層）の範囲、黒パネルの処理、濃さ。変えた値はすぐ保存され、次に刷るときに使われる。
+  テストカードの前などに本体の値もそろえたいときは「プリンタに送る」を押す（カードは使わない）
+- **クリーニング**タブ：クリーニングの時期と回数。「クリーニング」でクリーニングをする（リボンを外し、クリーニングカードを入れてから）
+
+印刷中はプリンタが使用中なので、状態を読めない（「使用中」と出る）。終わってから「更新」を押す。
+
+### リボンを付け替えたら
+
+Evolis Utility の「印刷の設定」タブで、付けたリボンを選ぶ。違うリボンのまま刷ると、カードが詰まったりリボンが切れたりする
+（ハーフパネルの R3013 に全面パネルの設定で刷ったときは、オーバーレイのリボンがカードに付いてきて、剥がそうとするとリボンが切れた）。
+プリンタはどのリボンが付いているかを知らせないので、ドライバでは見分けられない。
 
 ### iPhone・iPad・ほかの Mac から印刷する（v2.1 から）
 
-Evolis Utility の「印刷の設定」タブで「ほかの機器から印刷できるようにする」をオンにする（管理者のパスワードを聞かれる）。
-ターミナルなら `sudo evolis-setup --share`（やめるときは `--no-share`）。オンにすると Printer Application が同じネットワークに
-AirPrint のプリンタとして知らせるので、iPhone・iPad の「プリント」で「Evolis Pebble 4」を選べる。
+Evolis Utility の「印刷の設定」タブで「**ほかの機器から印刷できるようにする**」をオンにする（管理者のパスワードを聞かれる）。
+同じネットワークの iPhone・iPad・ほかの Mac の「プリント」で「Evolis Pebble 4」を選べるようになる（AirPrint）。
 
+<img src="images/iphone-printers.png" alt="iPhone のプリンタの一覧に出た Evolis Pebble 4" width="200"> <img src="images/iphone-options.png" alt="iPhone の印刷のオプション。用紙は 85.6 × 54mm" width="200">
+
+<img src="images/ipad-printers.png" alt="iPad のプリンタの一覧に出た Evolis Pebble 4" width="400"> <img src="images/ipad-options.png" alt="iPad の印刷のオプション。用紙は 85.6 × 54mm" width="400">
+
+- iPhone・iPad では、用紙サイズは最初から「85.6 × 54mm」になる。選べるのは部数、カラーでプリント、メディアタイプ、プリント品質
 - この Mac が起きていて、同じネットワークにいる必要がある
 - ネットワークの誰でも刷れる。リボンや濃さなどの設定は、この Mac の Evolis Utility からだけ変えられる
-  （ネットワークからの設定の変更は Printer Application が拒む。共有している間は Web の設定画面も止める）
-- iPhone・iPad の印刷画面では、用紙サイズは最初から「85.6 × 54mm」になる。選べるのは部数、カラーでプリント、メディアタイプ、プリント品質
 - macOS のファイアウォールがオンでも、「ダウンロードした署名済みソフトウェアを自動的に許可」がオン（既定）なら通る
-- macOS の「プリンタとスキャナ」の「ネットワークでこのプリンタを共有」では、iPhone・iPad には出てこない
-  （macOS は共有するプリンタを AirPrint として知らせない）。こちらはオフのままでよい
+- 「プリンタとスキャナ」の「ネットワークでこのプリンタを共有」では、iPhone・iPad には出てこない（macOS は共有するプリンタを AirPrint として知らせない）。こちらはオフのままでよい
 
 2026-10-15 に、iPhone と iPad から sample-card.pdf を刷って、どちらも Mac から刷ったものと同じカードが出ることを確かめた。
 
-<img src="images/iphone-printers.png" alt="iPhone のプリンタの一覧に出た Evolis Pebble 4" width="250"> <img src="images/iphone-options.png" alt="iPhone の印刷のオプション。用紙は 85.6 × 54mm" width="250">
+### プリントヘッドを交換したら
+
+新しいヘッドの白いラベルにあるキット番号を、Evolis Utility の「プリンタ」タブの「プリントヘッドのキット番号」→「変更…」で書く
+（ユーザーガイドの「プリントヘッドを交換する」の手順 3。Windows では公式ドライバの「プリンタダイアログ」で `Pkn;<番号>` を送るもの）。
+間違えると正しく印刷できなくなるので、2 回入力して一致したときだけ送り、読み直して確かめる。設定したら、刷る前にクリーニングが要る。
+キット番号にはヘッドのシリアルが入っているので、スクリーンショットを人に見せるときは隠す。
+
+## ターミナルで使う
+
+ターミナルからも、同じことができる。
+
+### キューの登録（`evolis-setup`）
+
+システム設定でプリンタを追加する代わりに、ターミナルで登録できる。
+
+```bash
+sudo evolis-setup --ribbon k                 # 登録して、既定のリボンを決める(k 黒 / ymckos ハーフパネルのカラー など)
+sudo evolis-setup --share                    # iPhone・iPad・ほかの Mac と共有する(--no-share でやめる)
+sudo evolis-setup --remove                   # キューを消す(--queue <名前> でほかの名前のキュー)
+```
+
+`--queue <名前>` でキューの名前を決められる（既定 `Evolis_Pebble_4`）。
+
+### 印刷の設定（`evolis-printer-app`）
+
+Evolis Utility の「印刷の設定」タブと同じことが、`evolis-printer-app` でできる（sudo は要らない）。値は PPD のオプションと同じ。
+
+```bash
+evolis-printer-app options -d "Evolis Pebble 4"                          # 今の設定(「(デフォルト)」の付いた行)
+evolis-printer-app modify -d "Evolis Pebble 4" -o evolis-ribbon=ymckos   # リボンを変える
+evolis-printer-app modify -d "Evolis Pebble 4" -o evolis-overlay=chipiso -o evolis-color-density=12
+```
+
+| 属性 | 値 |
+|---|---|
+| `evolis-ribbon` | `k` `ymcko` `ymckos` `ko` `kw` `kr` `kbl` `kgr` `kgo` `ksi` `ksc` `ka`（[リボンの種類](#リボンの種類pr)） |
+| `evolis-overlay` | `full`（全面）/ `none` / `chipiso`（IC チップを避ける）/ `magstripe`（磁気ストライプを避ける） |
+| `evolis-black-mode` | `gray`（網点）/ `line`（線画） |
+| `evolis-black-density` `evolis-color-density` `evolis-color-brightness` `evolis-overlay-density` | 0〜20（標準 10。明るさは大きいほど明るい） |
+
+### テストカードとクリーニング（`evolis-tool`）
+
+```bash
+evolis-tool test        # テストカード
+evolis-tool techtest    # 技術テストカード
+evolis-tool clean       # クリーニング(リボンを外し、クリーニングカードを入れてから)
+```
 
 ### v1（PPD のドライバ）から移る
 
-v2.0 の pkg を入れてから、今のキューと同じ名前で `evolis-setup` を実行すると、そのキューが Printer Application に切り替わる。
+v2 の pkg を入れてから、今のキューと同じ名前で `evolis-setup` を実行すると、そのキューが Printer Application に切り替わる。
 
 ```bash
 sudo evolis-setup --ribbon ymckos --queue EVOLIS_Pebble     # キューの名前は「プリンタとスキャナ」で見る
 ```
 
 名前を指定しなければ `Evolis_Pebble_4` という新しいキューができる。その場合、前のキューは残る（`evolis-setup` が知らせる）ので、
-使わなければ `sudo evolis-setup --remove --queue <名前>` で消す。
+使わなければ `sudo evolis-setup --remove --queue <名前>` で消す。システム設定で前のキューを消し、上の手順で追加し直してもよい。
 
 ### PPD のドライバで使う（v1 のやり方）
 
@@ -101,14 +153,30 @@ sudo evolis-setup --ribbon ymckos --queue EVOLIS_Pebble     # キューの名前
 sudo evolis-setup --ppd --ribbon k
 ```
 
-印刷ダイアログでリボンや濃さを選べる。付け替えたら `sudo lpadmin -p Evolis_Pebble_4 -o EvolisRibbon=<種類>` で既定を変える。
-USB の送信処理が失敗したとき（ジョブの途中でプリンタの電源を切ったときなど）は、キュー全体を止めずにそのジョブだけ取り消す
-（`printer-error-policy=abort-job`）。用紙サイズの選び忘れなど、ドライバ（フィルタ）が止めたジョブも、そのジョブだけが止まる。
+印刷ダイアログでリボンや濃さを選べる（Evolis Utility の「印刷の設定」は使わない）。付け替えたら
+`sudo lpadmin -p Evolis_Pebble_4 -o EvolisRibbon=<種類>` で既定を変えるか、印刷ダイアログのプリセットにリボンごとの設定を保存しておく。
+USB の送信が失敗したとき（ジョブの途中でプリンタの電源を切ったときなど）は、キュー全体を止めずにそのジョブだけ取り消す。
+CUPS の PPD を使うドライバは将来の CUPS で廃止される予定なので、ふだんは Printer Application を使う。
+
+## 入るもの
+
+| 入るもの | 場所 |
+|---|---|
+| Evolis Utility | `/Applications/Evolis Utility.app` |
+| Printer Application（Intel / Apple Silicon 両対応） | `/usr/local/libexec/evolis/evolis-printer-app`（`/usr/local/bin/evolis-printer-app` からも呼べる） |
+| 自動で起動する設定 | `/Library/LaunchDaemons/jp.yukino.evolis-printer-app.plist` |
+| 共有するかの設定 | `/Library/Application Support/evolis-printer-app.conf` |
+| コマンド | `/usr/local/bin/evolis-setup`、`/usr/local/bin/evolis-tool` |
+| CUPS フィルタと PPD（`--ppd` のとき使う） | `/usr/local/libexec/cups/filter/rastertoevolis`、`/usr/local/share/evolis/Pebble4.ppd` |
+| 組み込んだライブラリのライセンス | `/usr/local/share/evolis/licenses` |
+
+Printer Application は root で動き、Mac を起動したときから動いている。共有していないときは、この Mac の中（localhost）でだけ待ち受ける。
+プリンタと設定は `/private/var/lib/evolis-printer-app.state`、ログは `/Library/Logs/evolis-printer-app.log`（`sudo` で読む）に残る。
 
 ### アンインストール
 
 ```bash
-sudo evolis-setup --remove           # キュー(システム設定で登録した場合は、そこで削除する)
+sudo evolis-setup --remove           # キュー(システム設定で追加した場合は、そこで削除する)
 sudo launchctl bootout system/jp.yukino.evolis-printer-app
 sudo rm -f /Library/LaunchDaemons/jp.yukino.evolis-printer-app.plist /usr/local/bin/evolis-printer-app \
            "/Library/Application Support/evolis-printer-app.conf" \
@@ -119,44 +187,19 @@ sudo rm -rf /usr/local/libexec/evolis /usr/local/share/evolis "/Applications/Evo
 sudo pkgutil --forget jp.yukino.evolis-pebble4
 ```
 
-### Evolis Utility
-
-プリンタの状態を見たり、印刷の設定を変えたり、本体の機能を呼んだりするアプリ。pkg で `/Applications` に入るので、
-アプリケーションフォルダ（または Launchpad、Spotlight）から起動する。PPD に `*APPrinterUtilityPath` も書いてあるが、
-今の macOS（27）の「プリンタとスキャナ」には「プリンタユーティリティを開く」が無く（「オプションとサプライ」は
-「一般」と「サプライのレベル」だけ）、そこからは開けない。
-
-<img src="images/utility-ja.png" alt="Evolis Utility の「プリンタ」タブ" width="420"> <img src="images/utility-ja-settings.png" alt="Evolis Utility の「印刷の設定」タブ" width="420">
-
-- **プリンタ**タブ: 機種、ファームウェア、入れたカードの数、刷ったパネルの数、プリントヘッドのキット番号（`Rkn`）、
-  本体に残っている設定（リボンの設定、黒・カラー・オーバーレイの濃さ、カラーの明るさ）。テストカードと技術テストカードを刷る
-- **印刷の設定**タブ: macOS から刷るときのリボン、オーバーレイの範囲、黒パネルの処理、濃さ（Printer Application の既定値。
-  `evolis-printer-app options` / `modify` で読み書きするので sudo は要らない）。変えた値はすぐ保存され、次に刷るときにプリンタに送られる。
-  テストカードの前などに本体の値もそろえたいときは「プリンタに送る」を押す（`Pr` / `Pc` / `Pl` をその場で送る。カードは使わない）。
-  「ほかの機器から印刷できるようにする」で、iPhone・iPad・ほかの Mac と共有する
-- **クリーニング**タブ: 時期（`Rlr;r`）、回数、平均・最大の間隔。クリーニングを呼ぶ
-- テストカード、技術テストカード、クリーニングは、確認してから送る
-- **プリントヘッドのキット番号の変更**: ヘッドを交換したら、新しいヘッドの白いラベルにあるキット番号を本体に書く
-  （`Pkn;<番号>`。ユーザーガイドの「プリントヘッドを交換する」の手順 3。Windows では公式ドライバの「プリンタダイアログ」で送るもの）。
-  間違えると正しく印刷できなくなるので、2 回入力して一致したときだけ送り、`Rkn` で読み直して確かめる。
-  設定したら、印刷の前にクリーニングが要る。キット番号にはヘッドのシリアルが入っているので、スクリーンショットを人に見せるときは隠す
-
-USB は macOS 標準の IOUSBHost で直接読み書きする（libusb も Python も要らない）。印刷中は Printer Application（または CUPS）が
-プリンタを掴んでいるので読めず、「使用中」と出る。ソースは [`app/`](app/)、ビルドは `app/build-app.sh`。
-
 ### 自分でビルドする
 
 Xcode のコマンドラインツール（`xcode-select --install`）と python3 が要る。
 
 ```bash
-./driver/build-pkg.sh 2.0              # build/pkg/evolis-pebble4-2.0.pkg ができる
+./driver/build-pkg.sh 2.1.1            # build/pkg/evolis-pebble4-2.1.1.pkg ができる
 sudo driver/install.sh --ribbon k      # PPD のドライバだけを、pkg を作らずにその場でビルドして入れる（開発用）
 ```
 
 Printer Application は [PAPPL](https://www.msweet.org/pappl/) 1.4.12 と [LibreSSL](https://www.libressl.org/) 4.3.3 を
 組み込んで（静的にリンクして）作る。`build-pkg.sh` が初回に `printer-app/build-deps.sh` を呼び、
 両方をソースからビルドする（SHA-256 を確かめてからダウンロードする。2 分ほどかかる）。
-Printer Application だけを作るときは `printer-app/build.sh`。
+Printer Application だけを作るときは `printer-app/build.sh`、Evolis Utility だけを作るときは `app/build-app.sh`。
 
 `build-pkg.sh` は Developer ID 証明書があれば自動で署名する（無ければ未署名のまま作る）。
 `EVOLIS_NOTARY=<notarytool のプロファイル名>` を付けると公証まで行う。

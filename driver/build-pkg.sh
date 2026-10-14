@@ -106,6 +106,17 @@ for _ in 1 2 3 4 5; do
   launchctl print "system/$LABEL" >/dev/null 2>&1 && break
   sleep 1
 done
+# Printer Application の中にプリンタを作っておく(USB につないでいなくても作れる)。
+# これで、ターミナルを使わなくても「プリンタを追加」に Bonjour の Evolis Pebble 4 が出る
+APP=/usr/local/libexec/evolis/evolis-printer-app
+for _ in $(seq 1 40); do
+  launchctl print "system/$LABEL" 2>/dev/null | grep -q 'state = running' && [ -S /private/var/run/evolis-printer-app.sock ] && break
+  sleep 0.25
+done
+if launchctl print "system/$LABEL" 2>/dev/null | grep -q 'state = running'; then
+  "$APP" printers 2>/dev/null | grep -qx "Evolis Pebble 4" \
+    || "$APP" add -d "Evolis Pebble 4" -v "evolis-usb://Evolis/Pebble%204" -m evolis_pebble4 >/dev/null 2>&1 || true
+fi
 exit 0
 EOS
 chmod 755 "$BUILD/scripts/postinstall"
