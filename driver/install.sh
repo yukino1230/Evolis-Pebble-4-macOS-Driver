@@ -23,6 +23,7 @@ fi
 case "$lang" in ja*) JA=1 ;; *) JA=0 ;; esac
 say() { if [ "$JA" = 1 ]; then echo "$2"; else echo "$1"; fi; }
 while [ $# -gt 0 ]; do
+  case "$1" in --queue|--uri|--ribbon) [ $# -ge 2 ] || { say "$1 needs a value" "$1 には値が要ります"; exit 1; } ;; esac
   case "$1" in
     --queue)     QUEUE="$2"; shift 2 ;;
     --uri)       URI="$2"; shift 2 ;;
@@ -43,15 +44,18 @@ SHARE=/usr/local/share/evolis
 if [ "$UNINSTALL" = "1" ]; then
   say "==> Removing the queue: $QUEUE" "==> キューを削除: $QUEUE"
   lpadmin -x "$QUEUE" 2>/dev/null || say "    (no such queue)" "    (キューは存在しませんでした)"
-  rm -f "$FILTER"
-  rm -rf "$SHARE"
+  # pkg も入っているときは、pkg のファイル(フィルタ・licenses)は残す
+  if ! pkgutil --pkg-info jp.yukino.evolis-pebble4 >/dev/null 2>&1; then
+    rm -f "$FILTER"
+    rm -rf "$SHARE"
+  fi
   say "Done." "完了しました。"
   exit 0
 fi
 
 say "==> Looking for the printer" "==> プリンタを探す"
 if [ -z "$URI" ]; then
-  URI="$(lpinfo -v 2>/dev/null | awk '$2 ~ /^usb:\/\/EVOLIS\// {print $2; exit}')"
+  URI="$(lpinfo -v 2>/dev/null | awk '!u && $2 ~ /^usb:\/\/EVOLIS\// {u = $2} END {print u}')"
 fi
 [ -n "$URI" ] || { say "    No Evolis printer found on USB. Check the power and cable, or pass --uri" \
                         "    USB で Evolis が見つかりません。電源と接続を確認するか --uri で指定してください"; exit 1; }

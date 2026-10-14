@@ -94,7 +94,8 @@ LABEL=jp.yukino.evolis-printer-app
 # no-tls: 暗号化(IPPS)を使わない(_ipp と _ipps の両方で知らせると、印刷ダイアログに同じプリンタが 2 つ出るため)
 CONF="/Library/Application Support/evolis-printer-app.conf"
 mkdir -p "/Library/Application Support"
-if [ -f "$CONF" ] && ! grep -qx 'listen-hostname=localhost' "$CONF"; then
+# 共有しているのは、共有の設定(no-web-interface)が書いてあるときだけ。わからない形のときは共有しない
+if [ -f "$CONF" ] && grep -q 'no-web-interface' "$CONF"; then
   printf '%s\n' "# evolis-setup --share / --no-share が書き換える(今は、ほかの機器と共有している)" \
                  "server-options=no-web-interface,no-tls" > "$CONF"
 else
@@ -115,10 +116,9 @@ for _ in 1 2 3 4 5; do
 done
 # Printer Application の中にプリンタを作っておく(USB につないでいなくても作れる)。
 # これで、ターミナルを使わなくても「プリンタを追加」に Bonjour の Evolis Pebble 4 が出る
-# 待ち受けるまで待ってから呼ぶ。前のソケットのファイルが残っていることがあるので、ファイルがあるかではなく、
-# ポート 8630 で待ち受けているかを見る(待ち受ける前に呼ぶと、evolis-printer-app が別のサーバを立ち上げてしまう)
+# 起動しきるまで待ってから呼ぶ(サブコマンドは、サーバにつなげないときは失敗するだけで、別のサーバは立ち上げない)
 APP=/usr/local/libexec/evolis/evolis-printer-app
-listening() { lsof -nP -iTCP:8630 -sTCP:LISTEN 2>/dev/null | grep -q evolis; }
+listening() { "$APP" printers >/dev/null 2>&1; }
 for _ in $(seq 1 60); do listening && break; sleep 0.25; done
 if listening; then
   "$APP" printers 2>/dev/null | grep -qx "Evolis Pebble 4" \

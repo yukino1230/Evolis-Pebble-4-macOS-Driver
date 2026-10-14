@@ -33,6 +33,7 @@ fi
 case "$lang" in ja*) JA=1 ;; *) JA=0 ;; esac
 say() { if [ "$JA" = 1 ]; then echo "$2"; else echo "$1"; fi; }
 while [ $# -gt 0 ]; do
+  case "$1" in --ribbon|--queue) [ $# -ge 2 ] || { say "$1 needs a value" "$1 には値が要ります"; exit 1; } ;; esac
   case "$1" in
     --ribbon) RIBBON="$2"; shift 2 ;;
     --queue)  QUEUE="$2"; shift 2 ;;
@@ -73,7 +74,8 @@ if [ -n "$SHARE" ]; then
   exit 0
 fi
 if [ "$REMOVE" = 1 ]; then
-  lpadmin -x "$QUEUE" && say "Removed: $QUEUE" "削除しました: $QUEUE"; exit 0
+  lpadmin -x "$QUEUE" || { say "Could not remove the queue: $QUEUE" "キューを削除できません: $QUEUE"; exit 1; }
+  say "Removed: $QUEUE" "削除しました: $QUEUE"; exit 0
 fi
 case "$RIBBON" in k|ymcko|ymckos|ko|kw|kr|kbl|kgr|kgo|ksi|ksc|ka) ;;
   *) say "--ribbon must be one of k / ymcko / ymckos / ko / kw / kr / kbl / kgr / kgo / ksi / ksc / ka" \
@@ -103,7 +105,7 @@ fi
 # 呼んだ人の権限で別のサーバが立ち上がってしまうので、launchd で動いていることを先に確かめる
 running() { launchctl print "system/$LABEL" 2>/dev/null | grep -q 'state = running'; }
 running || launchctl bootstrap system "/Library/LaunchDaemons/$LABEL.plist" 2>/dev/null || true
-listening() { lsof -nP -iTCP:8630 -sTCP:LISTEN 2>/dev/null | grep -q evolis; }
+listening() { lsof -b -w -nP -iTCP:8630 -sTCP:LISTEN 2>/dev/null | grep -q evolis; }   # -b: 応答しないマウントで止まらない
 for _ in $(seq 1 60); do running && listening && break; sleep 0.25; done
 running && listening || { say "The Printer Application did not start (see /Library/Logs/evolis-printer-app.log)" \
                  "Printer Application が起動しません(/Library/Logs/evolis-printer-app.log を見てください)"; exit 1; }

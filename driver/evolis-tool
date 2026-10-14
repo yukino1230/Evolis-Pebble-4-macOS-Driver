@@ -19,6 +19,7 @@ fi
 case "$lang" in ja*) JA=1 ;; *) JA=0 ;; esac
 say() { if [ "$JA" = 1 ]; then echo "$2"; else echo "$1"; fi; }
 while [ $# -gt 0 ]; do
+  case "$1" in --queue) [ $# -ge 2 ] || { say "$1 needs a value" "$1 には値が要ります"; exit 1; } ;; esac
   case "$1" in
     --queue) QUEUE="$2"; shift 2 ;;
     test|techtest|clean) ACTION="$1"; shift ;;
@@ -38,6 +39,9 @@ fi
 # PPD のキューが無ければ、Printer Application(evolis-printer-app)に送る
 APP=/usr/local/libexec/evolis/evolis-printer-app
 USE_APP=0
+# --queue で Printer Application につながっている macOS のキューを指したときも、Printer Application に送る
+# (lp -o raw では、そのままプリンタに届かない)
+if [ -n "$QUEUE" ] && lpstat -v "$QUEUE" 2>/dev/null | grep -q 'ipp://localhost:8630/'; then QUEUE=""; fi
 # Printer Application が動いていないときに呼ぶと、別のサーバが立ち上がってしまうので、先に確かめる
 if [ -z "$QUEUE" ] && [ -x "$APP" ] \
    && launchctl print system/jp.yukino.evolis-printer-app 2>/dev/null | grep -q 'state = running' \

@@ -64,7 +64,7 @@ CASES
 # macOS からのジョブには独自属性が付かないので、プリンタの既定値(Web の設定画面や modify で決めたもの)で刷る
 "$APP" modify -d Test -o evolis-ribbon=ymckos -o evolis-overlay=chipiso
 before="$(finished)"
-ipptool -q -f "$ROOT/build/tests/color.ras" -d filetype=image/pwg-raster "$U" print-job.test 2>/dev/null || true
+ipptool -q -f "$ROOT/build/tests/color.ras" -d filetype=image/pwg-raster "$U" /usr/share/cups/ipptool/print-job.test 2>/dev/null || true
 for _ in $(seq 1 60); do [ "$(finished)" -gt "$before" ] && break; sleep 0.5; done
 out="$(ls -t "$WORK/out"/*.prn | head -1)"
 check printer-defaults "$(shasum -a 256 < "$out" | cut -c1-16)" "$(expected ymckos-chip)"

@@ -182,7 +182,7 @@ sudo rm -f /Library/LaunchDaemons/jp.yukino.evolis-printer-app.plist /usr/local/
            "/Library/Application Support/evolis-printer-app.conf" \
            /usr/local/libexec/cups/filter/rastertoevolis /usr/local/bin/evolis-setup /usr/local/bin/evolis-tool \
            /Library/Printers/PPDs/Contents/Resources/EvolisPebble4.ppd.gz /Library/Logs/evolis-printer-app.log \
-           /private/var/run/evolis-printer-app.sock
+           /Library/Logs/evolis-printer-app.log.O /private/var/run/evolis-printer-app.sock
 sudo rm -rf /usr/local/libexec/evolis /usr/local/share/evolis "/Applications/Evolis Utility.app" \
             /private/var/lib/evolis-printer-app.state /private/var/spool/evolis-printer-app
 sudo pkgutil --forget jp.yukino.evolis-pebble4

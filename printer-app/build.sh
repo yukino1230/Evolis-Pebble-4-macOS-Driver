@@ -1,14 +1,14 @@
 #!/bin/bash
 # Evolis Printer Application をビルドする(Intel / Apple Silicon 両対応)。
 #   printer-app/build.sh [バージョン] [出力先]
-# 先に printer-app/build-deps.sh で PAPPL と LibreSSL を作っておく(無ければ作る)。
+# PAPPL と LibreSSL は printer-app/build-deps.sh で作る(毎回呼ぶ。作ってあれば、まとめ直すだけ)。
 set -euo pipefail
 VER="${1:-2.0}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$HERE/.."
 DEPS="$ROOT/build/deps/universal"
 OUT="${2:-$ROOT/build/printer-app}"
-[ -f "$DEPS/lib/libpappl.a" ] || "$HERE/build-deps.sh"
+"$HERE/build-deps.sh" >/dev/null
 mkdir -p "$OUT"
 # Web の設定画面の英語と日本語(PPD と同じ表示名)
 python3 "$HERE/mkstrings.py" > "$OUT/evolis-strings.h"

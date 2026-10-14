@@ -25,10 +25,13 @@ LIBRESSL_VER=4.3.3
 LIBRESSL_SHA=ff97c432457f349e6ba3d416ab903bc7468f1436f0f32efe5fff808de292c7b8
 
 fetch() {   # URL ファイル名 SHA-256
-  [ -f "$SRC/$2" ] || curl -fsSL -o "$SRC/$2" "$1"
-  echo "$3  $SRC/$2" | shasum -a 256 -c - >/dev/null || { echo "SHA-256 が合いません: $2" >&2; exit 1; }
+  # 途中で切れたファイルが残らないよう、別の名前に落としてから置く。合わなければ消して、次は落とし直す
+  if [ ! -f "$SRC/$2" ]; then curl -fsSL -o "$SRC/$2.part" "$1" && mv "$SRC/$2.part" "$SRC/$2"; fi
+  echo "$3  $SRC/$2" | shasum -a 256 -c - >/dev/null || { rm -f "$SRC/$2"; echo "SHA-256 が合いません: $2" >&2; exit 1; }
 }
 mkdir -p "$SRC"
+# pappl.patch が変わったら PAPPL を作り直す(前のパッチで作ったライブラリを使い続けないように)
+PATCH_SUM="$(shasum -a 256 < "$HERE/pappl.patch" | cut -d' ' -f1)"
 fetch "https://github.com/michaelrsweet/pappl/releases/download/v$PAPPL_VER/pappl-$PAPPL_VER.tar.gz" \
       "pappl-$PAPPL_VER.tar.gz" "$PAPPL_SHA"
 fetch "https://cdn.openbsd.org/pub/OpenBSD/LibreSSL/libressl-$LIBRESSL_VER.tar.gz" \
@@ -47,7 +50,7 @@ for arch in arm64 x86_64; do
                  --disable-tests >/dev/null && make -j"$JOBS" >/dev/null && make install >/dev/null)
   fi
 
-  if [ ! -f "$PREFIX/lib/libpappl.a" ]; then
+  if [ ! -f "$PREFIX/lib/libpappl.a" ] || [ "$(cat "$PREFIX/.pappl-patch" 2>/dev/null)" != "$PATCH_SUM" ]; then
     echo "==> PAPPL $PAPPL_VER ($arch)"
     B="$DEPS/build-$arch/pappl"; rm -rf "$B"; mkdir -p "$B"
     tar xzf "$SRC/pappl-$PAPPL_VER.tar.gz" -C "$B" --strip-components 1
@@ -63,6 +66,7 @@ for arch in arm64 x86_64; do
     mkdir -p "$PREFIX/lib" "$PREFIX/include/pappl"
     cp "$B/pappl/libpappl.a" "$PREFIX/lib/"
     cp "$B"/pappl/*.h "$PREFIX/include/pappl/"
+    echo "$PATCH_SUM" > "$PREFIX/.pappl-patch"
   fi
 done
 
