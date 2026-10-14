@@ -102,8 +102,9 @@ fi
 # 呼んだ人の権限で別のサーバが立ち上がってしまうので、launchd で動いていることを先に確かめる
 running() { launchctl print "system/$LABEL" 2>/dev/null | grep -q 'state = running'; }
 running || launchctl bootstrap system "/Library/LaunchDaemons/$LABEL.plist" 2>/dev/null || true
-for _ in $(seq 1 40); do running && lsof -nP -iTCP:8630 -sTCP:LISTEN >/dev/null 2>&1 && break; sleep 0.25; done
-running || { say "The Printer Application did not start (see /Library/Logs/evolis-printer-app.log)" \
+listening() { lsof -nP -iTCP:8630 -sTCP:LISTEN 2>/dev/null | grep -q evolis; }
+for _ in $(seq 1 60); do running && listening && break; sleep 0.25; done
+running && listening || { say "The Printer Application did not start (see /Library/Logs/evolis-printer-app.log)" \
                  "Printer Application が起動しません(/Library/Logs/evolis-printer-app.log を見てください)"; exit 1; }
 # プリンタが無ければ足す(USB につないでいなくても足せる)。リボンは既定値として覚えさせる
 "$APP" printers | grep -qx "$PRINTER" || "$APP" add -d "$PRINTER" -v "$USB_URI" -m evolis_pebble4

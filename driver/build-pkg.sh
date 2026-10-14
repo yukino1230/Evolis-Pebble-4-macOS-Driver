@@ -100,6 +100,8 @@ fi
 mkdir -p /private/var/spool/evolis-printer-app
 # 止めるのは非同期なので、止まりきってから起動する(止まる前に起動すると失敗し、動かないままになる)
 launchctl bootout "system/$LABEL" 2>/dev/null || true
+# v2.1.1 までの evolis-printer-app のサブコマンドが立ち上げてしまったサーバ(private-server)が残っていれば止める
+pkill -f "evolis-printer-app server -o private-server=true" 2>/dev/null || true
 for _ in $(seq 1 40); do launchctl print "system/$LABEL" >/dev/null 2>&1 || break; sleep 0.25; done
 for _ in 1 2 3 4 5; do
   launchctl bootstrap system "/Library/LaunchDaemons/$LABEL.plist" 2>/dev/null && break
@@ -108,12 +110,12 @@ for _ in 1 2 3 4 5; do
 done
 # Printer Application の中にプリンタを作っておく(USB につないでいなくても作れる)。
 # これで、ターミナルを使わなくても「プリンタを追加」に Bonjour の Evolis Pebble 4 が出る
+# 待ち受けるまで待ってから呼ぶ。前のソケットのファイルが残っていることがあるので、ファイルがあるかではなく、
+# ポート 8630 で待ち受けているかを見る(待ち受ける前に呼ぶと、evolis-printer-app が別のサーバを立ち上げてしまう)
 APP=/usr/local/libexec/evolis/evolis-printer-app
-for _ in $(seq 1 40); do
-  launchctl print "system/$LABEL" 2>/dev/null | grep -q 'state = running' && [ -S /private/var/run/evolis-printer-app.sock ] && break
-  sleep 0.25
-done
-if launchctl print "system/$LABEL" 2>/dev/null | grep -q 'state = running'; then
+listening() { lsof -nP -iTCP:8630 -sTCP:LISTEN 2>/dev/null | grep -q evolis; }
+for _ in $(seq 1 60); do listening && break; sleep 0.25; done
+if listening; then
   "$APP" printers 2>/dev/null | grep -qx "Evolis Pebble 4" \
     || "$APP" add -d "Evolis Pebble 4" -v "evolis-usb://Evolis/Pebble%204" -m evolis_pebble4 >/dev/null 2>&1 || true
 fi

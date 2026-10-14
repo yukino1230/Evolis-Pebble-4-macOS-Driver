@@ -50,6 +50,12 @@ for arch in arm64 x86_64; do
     echo "==> PAPPL $PAPPL_VER ($arch)"
     B="$DEPS/build-$arch/pappl"; rm -rf "$B"; mkdir -p "$B"
     tar xzf "$SRC/pappl-$PAPPL_VER.tar.gz" -C "$B" --strip-components 1
+    # サブコマンド(options / modify など)がサーバにつなげないとき、自分でサーバを立ち上げないようにする。
+    # このドライバでは Printer Application は LaunchDaemon で動かすので、立ち上がると同じ状態のファイルを
+    # 使うサーバが 2 つになってしまう(つながらないときは、エラーで終わればよい)
+    sed -i '' 's/if (!http \&\& auto_start)/if (!http \&\& auto_start \&\& getenv("EVOLIS_ALLOW_PRIVATE_SERVER"))/' \
+        "$B/pappl/mainloop-support.c"
+    grep -q 'EVOLIS_ALLOW_PRIVATE_SERVER' "$B/pappl/mainloop-support.c" || { echo "PAPPL に変更を当てられません" >&2; exit 1; }
     (cd "$B" && PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig" \
        ./configure --host="$HOST" --prefix="$PREFIX" --disable-shared --with-tls=libressl \
                    --with-dnssd=mdnsresponder --disable-libjpeg --disable-libpng --disable-libusb \
