@@ -2,7 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
   Evolis Printer Application を起動したときから動かしておく(root で動く LaunchDaemon)。
-  この Mac からだけ使えるようにする: localhost でだけ待ち受け、DNS-SD もこの Mac にだけ広告する。
+  この Mac からだけ使うか、ほかの機器(iPhone・iPad など)からも AirPrint で刷れるようにするかは、
+  /Library/Application Support/evolis-printer-app.conf で決める(evolis-setup --share / --no-share が書き換える)。
   状態(プリンタと既定値)は /private/var/lib/evolis-printer-app.state に残る。
 -->
 <plist version="1.0">
@@ -12,8 +13,6 @@
   <array>
     <string>/usr/local/libexec/evolis/evolis-printer-app</string>
     <string>server</string>
-    <string>-o</string><string>server-hostname=localhost</string>
-    <string>-o</string><string>listen-hostname=localhost</string>
     <string>-o</string><string>server-port=8630</string>
     <string>-o</string><string>spool-directory=/private/var/spool/evolis-printer-app</string>
     <string>-o</string><string>log-file=/Library/Logs/evolis-printer-app.log</string>

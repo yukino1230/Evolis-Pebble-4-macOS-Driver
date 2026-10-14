@@ -89,6 +89,14 @@ rm -f /Library/Printers/PPDs/Contents/Resources/EvolisPebble4.ppd.gz
 killall -HUP cupsd 2>/dev/null || true
 # Printer Application を(入れ直したときは止めてから)起動する
 LABEL=jp.yukino.evolis-printer-app
+# ほかの機器と共有するかの設定。無ければ(初めてと v2.0.x から上げたとき)、この Mac からだけ使う設定にする
+CONF="/Library/Application Support/evolis-printer-app.conf"
+if [ ! -f "$CONF" ]; then
+  mkdir -p "/Library/Application Support"
+  printf '%s\n' "# evolis-setup --share / --no-share が書き換える(この 2 行があると、この Mac からだけ使える)" \
+                 "listen-hostname=localhost" "server-hostname=localhost" > "$CONF"
+  chmod 644 "$CONF"
+fi
 launchctl bootout "system/$LABEL" 2>/dev/null || true
 mkdir -p /private/var/spool/evolis-printer-app
 launchctl bootstrap system "/Library/LaunchDaemons/$LABEL.plist" 2>/dev/null || launchctl kickstart -k "system/$LABEL" || true

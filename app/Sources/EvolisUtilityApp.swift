@@ -52,6 +52,7 @@ struct ContentView: View {
                 Form {
                     if settings.available {
                         printSettings
+                        sharing
                     } else {
                         Text("The Printer Application is not installed, or the printer is not registered. Run: sudo evolis-setup")
                             .foregroundStyle(.secondary)
@@ -139,6 +140,21 @@ struct ContentView: View {
                 if let error = settings.error { Text(error).foregroundStyle(.red) }
             }
             .font(.footnote).foregroundStyle(.secondary)
+        }
+    }
+
+    /// ほかの機器から AirPrint で刷れるようにする(evolis-setup --share / --no-share)
+    private var sharing: some View {
+        Section {
+            HStack {
+                Toggle(L("Allow printing from other devices (iPhone, iPad, other Macs)"),
+                       isOn: Binding(get: { settings.shared ?? false }, set: { settings.setShared($0) }))
+                    .disabled(settings.shared == nil || settings.changingShare)
+                if settings.changingShare { ProgressView().controlSize(.small) }
+            }
+        } footer: {
+            Text("Devices on the same network can print to this printer with AirPrint. This Mac must be awake. Anyone on the network can print, but settings can only be changed here (the web settings page is off while sharing). Changing this asks for an administrator password.")
+                .font(.footnote).foregroundStyle(.secondary)
         }
     }
 

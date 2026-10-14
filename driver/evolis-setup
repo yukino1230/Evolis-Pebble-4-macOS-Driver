@@ -3,6 +3,7 @@
 #   sudo evolis-setup [--ribbon k|ymcko|ymckos|ko|kw|kr|kbl|kgr|kgo|ksi|ksc|ka] [--queue Evolis_Pebble_4]
 #   sudo evolis-setup --ppd [--ribbon ...] [--queue ...]      PPD のドライバで登録する(以前のやり方)
 #   sudo evolis-setup --remove [--queue Evolis_Pebble_4]
+#   sudo evolis-setup --share | --no-share   ほかの機器(iPhone・iPad・ほかの Mac)から AirPrint で刷れるようにするか
 #     --ribbon は既定のリボン(装着しているものに合わせる。既定 k)
 #
 # 標準は Printer Application(evolis-printer-app、ドライバ無しの IPP Everywhere)で登録する。
@@ -12,6 +13,8 @@ QUEUE="Evolis_Pebble_4"
 RIBBON="k"
 REMOVE=0
 MODE=app
+SHARE=""
+CONF="/Library/Application Support/evolis-printer-app.conf"
 PPD=/usr/local/share/evolis/Pebble4.ppd
 APP=/usr/local/libexec/evolis/evolis-printer-app
 LABEL=jp.yukino.evolis-printer-app
@@ -35,11 +38,39 @@ while [ $# -gt 0 ]; do
     --queue)  QUEUE="$2"; shift 2 ;;
     --ppd)    MODE=ppd; shift ;;
     --remove) REMOVE=1; shift ;;
+    --share)    SHARE=on; shift ;;
+    --no-share) SHARE=off; shift ;;
     *) say "Unknown argument: $1" "不明な引数: $1"; exit 1 ;;
   esac
 done
 
 [ "$(id -u)" = "0" ] || { say "Run with sudo" "sudo で実行してください"; exit 1; }
+if [ -n "$SHARE" ]; then
+  # 共有するかどうかは Printer Application の設定ファイルで決め、起動し直して反映する
+  if [ "$SHARE" = on ]; then
+    # Web の設定画面は止める(PAPPL 1.4 は、設定画面をネットワークから使えないようにする設定が効かないため)。
+    # 設定は Evolis Utility と evolis-printer-app modify(この Mac の中のソケット経由)で変える
+    printf '%s\n' "# evolis-setup --share / --no-share が書き換える(今は、ほかの機器と共有している)" \
+                   "server-options=no-web-interface" > "$CONF"
+  else
+    printf '%s\n' "# evolis-setup --share / --no-share が書き換える(この 2 行があると、この Mac からだけ使える)" \
+                   "listen-hostname=localhost" "server-hostname=localhost" > "$CONF"
+  fi
+  chmod 644 "$CONF"
+  launchctl kickstart -k "system/$LABEL" >/dev/null 2>&1 || launchctl bootstrap system "/Library/LaunchDaemons/$LABEL.plist"
+  if [ "$SHARE" = on ]; then
+    say "Shared. iPhone, iPad and other Macs on the same network can print to \"Evolis Pebble 4\" (AirPrint)." \
+        "共有しました。同じネットワークの iPhone・iPad・ほかの Mac から「Evolis Pebble 4」に刷れます(AirPrint)。"
+    say "  This Mac must be awake. Anyone on the network can print; settings can only be changed on this Mac" \
+        "  この Mac が起きている必要があります。ネットワークの誰でも刷れます(設定はこの Mac の Evolis Utility からだけ変えられ、"
+    say "  with Evolis Utility (the web settings page is off while sharing)." \
+        "  共有している間は Web の設定画面は開けません)。"
+    say "  Stop sharing: sudo evolis-setup --no-share" "  やめるとき: sudo evolis-setup --no-share"
+  else
+    say "Stopped sharing. Only this Mac can print." "共有をやめました。この Mac からだけ刷れます。"
+  fi
+  exit 0
+fi
 if [ "$REMOVE" = 1 ]; then
   lpadmin -x "$QUEUE" && say "Removed: $QUEUE" "削除しました: $QUEUE"; exit 0
 fi

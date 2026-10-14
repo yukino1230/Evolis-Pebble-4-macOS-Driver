@@ -4,6 +4,7 @@
 "%@ times" = "%@ 回";
 "A kit number starts with three digits." = "キット番号は数字 3 桁で始まります。";
 "A wrong number makes the printer print incorrectly and may void the warranty. Clean the printer before printing." = "番号を間違えると正しく印刷できなくなり、保証が無効になることがあります。設定したら、印刷の前にクリーニングしてください。";
+"Allow printing from other devices (iPhone, iPad, other Macs)" = "ほかの機器から印刷できるようにする（iPhone・iPad・ほかの Mac）";
 "Average cleaning interval" = "クリーニングの平均間隔";
 "Avoid IC chip (ISO 7816)" = "IC チップを避ける (ISO 7816)";
 "Avoid magnetic stripe (ISO 7811, back side)" = "磁気ストライプを避ける (ISO 7811、裏面用)";
@@ -33,8 +34,10 @@
 "Color brightness" = "カラーの明るさ";
 "Color density" = "カラーの濃さ";
 "Communication failed: %@" = "通信できませんでした: %@";
+"Could not change sharing: %@" = "共有を切り替えられませんでした: %@";
 "Could not save the setting: %@" = "設定を保存できませんでした: %@";
 "Current" = "今の番号";
+"Devices on the same network can print to this printer with AirPrint. This Mac must be awake. Anyone on the network can print, but settings can only be changed here (the web settings page is off while sharing). Changing this asks for an administrator password." = "同じネットワークの機器から AirPrint で刷れるようになります。この Mac が起きている必要があります。ネットワークの誰でも刷れますが、設定はここからしか変えられません（共有している間は Web の設定画面は開けません）。切り替えるときは管理者のパスワードを聞かれます。";
 "Enter it again" = "もう一度入力";
 "Firmware" = "ファームウェア";
 "Full card" = "全面";

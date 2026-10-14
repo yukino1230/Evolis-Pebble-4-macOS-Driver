@@ -44,10 +44,55 @@ final class PrintSettings: ObservableObject {
     @Published var values: [String: String] = [:]
     @Published var error: String?
 
+    /// ほかの機器(iPhone・iPad・ほかの Mac)から AirPrint で刷れるようにしているか(nil = わからない)
+    @Published var shared: Bool?
+    @Published var changingShare = false
+    nonisolated static let conf = "/Library/Application Support/evolis-printer-app.conf"
+
     func value(_ attr: String, _ fallback: String) -> String { values[attr] ?? fallback }
+
+    /// 共有しているかは、Printer Application の設定ファイルに localhost の指定があるかで決まる(evolis-setup が書く)
+    func loadShared() {
+        guard let text = try? String(contentsOfFile: Self.conf, encoding: .utf8) else { shared = nil; return }
+        shared = !text.split(separator: "\n").contains { $0.trimmingCharacters(in: .whitespaces) == "listen-hostname=localhost" }
+    }
+
+    /// 共有を切り替える。Printer Application の起動のしかたを変えるので、管理者のパスワードを聞く
+    func setShared(_ on: Bool) {
+        guard shared != on, !changingShare else { return }
+        changingShare = true
+        let command = "/usr/local/bin/evolis-setup \(on ? "--share" : "--no-share")"
+        Task.detached {
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+            p.arguments = ["-e", "do shell script \"\(command)\" with administrator privileges"]
+            let pipe = Pipe()
+            p.standardOutput = pipe
+            p.standardError = pipe
+            var output = ""
+            do {
+                try p.run()
+                output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+                p.waitUntilExit()
+            } catch {
+                output = error.localizedDescription
+            }
+            let ok = p.terminationStatus == 0
+            let canceled = output.contains("-128")          // パスワードの画面でキャンセルした
+            let message = output.trimmingCharacters(in: .whitespacesAndNewlines)
+            await MainActor.run {
+                self.changingShare = false
+                self.loadShared()
+                if !ok && !canceled {
+                    self.error = String(format: L("Could not change sharing: %@"), message)
+                }
+            }
+        }
+    }
     func number(_ attr: String) -> Int { Int(values[attr] ?? "") ?? 10 }
 
     func load() {
+        loadShared()
         guard FileManager.default.isExecutableFile(atPath: Self.tool) else { available = false; return }
         Task.detached {
             let result = Self.run(["options", "-d", Self.printer])
